@@ -1,3 +1,10 @@
+# Virtual environments
+.DLA_env
+.DLA_env_linux
+
+# Datasets
+data
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
