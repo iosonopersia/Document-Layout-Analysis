@@ -33,14 +33,6 @@ class COCOBoundingBox:
         return self.y + self.h / 2
 
     @property
-    def width(self) -> float:
-        return self.w
-
-    @property
-    def height(self) -> float:
-        return self.h
-
-    @property
     def area(self) -> float:
         return self.w * self.h
 
