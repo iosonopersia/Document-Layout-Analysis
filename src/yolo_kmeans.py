@@ -4,6 +4,8 @@ import json
 import matplotlib.pyplot as plt
 import numpy as np
 
+from utils import get_config
+
 
 class YOLO_KMeans:
     def __init__(self, filename):
@@ -143,15 +145,19 @@ class YOLO_KMeans:
 
 
 if __name__ == "__main__":
-    kmeans = YOLO_KMeans("E:/DocLayNet_core/COCO/train.json")
+    config = get_config()
+    train_file = config.dataset.train_labels_file
+    image_size = config.dataset.image_size
+
+    kmeans = YOLO_KMeans(config.dataset.train_labels_file)
     clusters = kmeans.fit(k=12) # default distance function is np.median, with np.mean AVG_IOU is 2.6% lower
     labels = kmeans.transform(clusters)
 
-    print(f"K anchors:\n {clusters*1025}")
+    print(f"K anchors:\n {clusters*image_size}")
 
     avg_iou = kmeans.avg_iou(clusters)
     print(f"Avg. IoU: {round(avg_iou * 100.0, 2)}%")
 
     # Save results
-    kmeans.save_plot(clusters, labels, filename="anchors.png")
-    kmeans.clusters_to_csv(clusters, filename="anchors.csv")
+    kmeans.save_plot(clusters, labels, filename="data/anchors.png")
+    kmeans.clusters_to_csv(clusters, filename="data/anchors.csv")
