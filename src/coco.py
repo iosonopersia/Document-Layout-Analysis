@@ -7,6 +7,28 @@ class COCOBoundingBox:
     y: float # Top left corner
     w: float # Width
     h: float # Height
+    max_width: int = 1 # These are used to scale the bounding box to the image size
+    max_height: int = 1 # These are used to scale the bounding box to the image size
+
+    def __post_init__(self):
+        """
+        Checks that the bounding box is valid
+
+        Raises:
+            ValueError: If the bounding box is invalid
+        """
+        if self.max_width < 1 or self.max_height < 1:
+            raise ValueError("Max width and height must be greater than 1")
+        if self.x < 0 or self.y < 0:
+            raise ValueError("x and y must be positive")
+        if self.x > self.max_width or self.y > self.max_height:
+            raise ValueError("x and y must be less than the max width and height")
+        if self.w < 0 or self.h < 0:
+            raise ValueError("Width and height must be positive")
+        if self.w > self.max_width or self.h > self.max_height:
+            raise ValueError("Width and height must be less than the max width and height")
+        if self.x + self.w > self.max_width or self.y + self.h > self.max_height:
+            raise ValueError("x + width and y + height must be less than the max width and height")
 
     @property
     def x1(self) -> float:
@@ -36,12 +58,12 @@ class COCOBoundingBox:
     def area(self) -> float:
         return self.w * self.h
 
-    def to_normalized(self, max_width: int, max_height: int) -> "COCOBoundingBox":
+    def to_normalized(self) -> "COCOBoundingBox":
         return COCOBoundingBox(
-            self.x / max_width,
-            self.y / max_height,
-            self.w / max_width,
-            self.h / max_height)
+            self.x / self.max_width,
+            self.y / self.max_height,
+            self.w / self.max_width,
+            self.h / self.max_height)
 
     def to_list(self) -> list[float]:
         return [self.x, self.y, self.w, self.h]
