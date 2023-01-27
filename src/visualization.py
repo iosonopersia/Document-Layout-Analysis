@@ -76,12 +76,15 @@ def visualize_bbox(img: ndarray, bbox: COCOBoundingBox, class_name: str, border_
 
 
 def visualize(image: ndarray, bboxes: list[COCOBoundingBox], category_ids: list[int],
-              category_id_to_name: dict[int, str], category_id_to_colour: dict[int, tuple[int]],
+              category_id_to_name: dict[int, str], category_id_to_colour: dict[int, tuple[int]] = None,
               is_normalized: bool=True) -> None:
     img = image.copy()
     for bbox, category_id in zip(bboxes, category_ids):
         class_name = category_id_to_name[category_id]
-        colour = category_id_to_colour[category_id]
+        if category_id_to_colour is None:
+            colour = RED
+        else:
+            colour = category_id_to_colour[category_id]
         img = visualize_bbox(img, bbox, class_name, colour, is_normalized=is_normalized)
     plt.figure(figsize=(12, 12))
     plt.axis('off')
