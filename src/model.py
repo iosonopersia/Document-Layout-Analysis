@@ -6,7 +6,9 @@ import torch
 import torchvision
 from munch import Munch
 from torch import Tensor
-from transformers import BeitModel
+from transformers import BeitModel, logging
+
+logging.set_verbosity_error()
 
 
 class DocumentObjectDetector(torch.nn.Module):
@@ -15,15 +17,22 @@ class DocumentObjectDetector(torch.nn.Module):
 
         self.C: int = int(config.num_classes)
         self.FPN_CHANNELS: int = int(config.fpn_channels)
-        self.BACKBONE_CHECKPOINT: str = config.backbone_checkpoint
+        self.BACKBONE_NAME: str = config.backbone
 
-        if self.BACKBONE_CHECKPOINT is None or self.BACKBONE_CHECKPOINT == "":
+        if self.BACKBONE_NAME is None or self.BACKBONE_NAME == "":
             warnings.warn("backbone_checkpoint is not set. Using default checkpoint.")
-            self.BACKBONE_CHECKPOINT = "microsoft/dit-large"
+            self.BACKBONE_NAME = "microsoft/dit-base"
 
         # DiT backbone
-        self.backbone = BeitModel.from_pretrained(self.BACKBONE_CHECKPOINT, add_pooling_layer=False)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            self.backbone = BeitModel.from_pretrained(self.BACKBONE_NAME, add_pooling_layer=False)
         self.backbone_forward = partial(self.backbone.forward, output_attentions=True, output_hidden_states=True, return_dict=True)
+
+        self.num_patches_per_side: int = self.backbone.config.image_size // self.backbone.config.patch_size
+        self.num_patches: int = self.num_patches_per_side ** 2
+        self.num_hidden_layers: int = self.backbone.config.num_hidden_layers
+        self.hidden_size: int = self.backbone.config.hidden_size
 
         # Feature map rescalers
         # conv_output_size = (input_size - kernel_size + 2 * padding) / stride + 1
@@ -31,21 +40,30 @@ class DocumentObjectDetector(torch.nn.Module):
         self.rescalers = torch.nn.ModuleList([
             # 4x upscaling
             torch.nn.Sequential(
-                torch.nn.ConvTranspose2d(in_channels=1024, out_channels=1024, kernel_size=2, stride=2),
-                torch.nn.ConvTranspose2d(in_channels=1024, out_channels=1024, kernel_size=2, stride=2),
+                torch.nn.ConvTranspose2d(
+                    in_channels=self.hidden_size,
+                    out_channels=self.hidden_size,
+                    kernel_size=2,
+                    stride=2),
+                torch.nn.ConvTranspose2d(
+                    in_channels=self.hidden_size,
+                    out_channels=self.hidden_size,
+                    kernel_size=2,
+                    stride=2),
             ),
             # 2x upscaling
-            torch.nn.ConvTranspose2d(in_channels=1024, out_channels=1024, kernel_size=2, stride=2),
+            torch.nn.ConvTranspose2d(
+                in_channels=self.hidden_size,
+                out_channels=self.hidden_size,
+                kernel_size=2,
+                stride=2),
             # identity
             torch.nn.Identity(),
             # 2x downscaling
-            torch.nn.MaxPool2d(kernel_size=2, stride=2),
+            torch.nn.MaxPool2d(
+                kernel_size=2,
+                stride=2),
         ])
-
-        self.num_patches_per_side: int = self.backbone.config.image_size // self.backbone.config.patch_size
-        self.num_patches: int = self.num_patches_per_side ** 2
-        self.num_hidden_layers: int = self.backbone.config.num_hidden_layers
-        self.hidden_size: int = self.backbone.config.hidden_size
 
         self.fpn_layers: list[int] = [
             self.num_hidden_layers // 3 - 1,
