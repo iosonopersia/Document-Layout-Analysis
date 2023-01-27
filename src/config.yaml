@@ -1,0 +1,66 @@
+---
+
+checkpoint:
+    path: checkpoints/model.pth
+    save_checkpoint: True
+    load_checkpoint: False
+
+dataset:
+    images_dir: E:/DocLayNet_core/PNG/
+    train_labels_file: E:/DocLayNet_core/COCO/train.json
+    val_labels_file: E:/DocLayNet_core/COCO/val.json
+    test_labels_file: E:/DocLayNet_core/COCO/test.json
+    anchors_file: data/anchors.csv
+    num_classes: 11
+    image_size: 1025
+    doc_categories_to_keep: ['scientific_articles']
+
+model:
+    fpn_channels: 512
+    backbone: microsoft/dit-base
+
+hyperparameters:
+    train:
+        epochs: 1000
+        learning_rate: 1.0e-3
+        weight_decay: 1.0e-4
+        gradient_accumulation_steps: 4
+        scheduler:
+            enabled: False
+            scheduler_fn: ExponentialLR
+            gamma: 0.98
+        early_stopping:
+            enabled: True
+            patience: 10
+            restore_best_weights: True
+    test:
+        confidence_threshold: 0.05
+        map_iou_threshold: 0.5
+        nms_iou_threshold: 0.45
+
+dataloader:
+    train:
+        shuffle: True
+        batch_size: 8
+        num_workers: 2
+        pin_memory: True
+    val:
+        shuffle: False
+        batch_size: 8
+        num_workers: 2
+        pin_memory: True
+    test:
+        shuffle: False
+        batch_size: 8
+        num_workers: 2
+        pin_memory: True
+
+wandb:
+    enabled: False
+    watch_model: False
+    project_name: document-layout-analysis
+    entity: "iosonopersia" # user or team name
+    resume_run: False
+    resume_run_id: "" # wandb run id to resume
+
+...
