@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 
-@dataclass
+@dataclass(frozen=True)
 class COCOBoundingBox:
     x: float # Top left corner
     y: float # Top left corner
@@ -76,7 +76,7 @@ class COCOBoundingBox:
         return intersection / union
 
 
-@dataclass
+@dataclass(frozen=True)
 class COCOAnnotation:
     annotation_id: int
     image_id: int
