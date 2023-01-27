@@ -62,7 +62,10 @@ class DocumentObjectDetector(torch.nn.Module):
             self.num_patches_per_side, # number of patches along the horizontal axis #? W or H?
             self.num_patches_per_side # number of patches along the vertical axis #? W or H?
         )
-        self.fpn = torchvision.ops.FeaturePyramidNetwork([self.hidden_size]*len(self.fpn_layers), self.FPN_CHANNELS)
+        self.fpn = torchvision.ops.FeaturePyramidNetwork(
+            in_channels_list=[self.hidden_size]*len(self.fpn_layers),
+            out_channels=self.FPN_CHANNELS,
+            norm_layer=torch.nn.BatchNorm2d)
 
         # YOLOv3 head (1x1 convolutions)
         self.yolo_head = torch.nn.Conv2d(in_channels=self.FPN_CHANNELS, out_channels=3 * (5 + self.C), kernel_size=1)
