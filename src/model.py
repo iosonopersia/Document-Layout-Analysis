@@ -4,29 +4,31 @@ from functools import partial
 
 import torch
 import torchvision
-from munch import Munch
 from torch import Tensor
 from transformers import BeitModel, logging
+
+from utils import get_config
 
 logging.set_verbosity_error()
 
 
 class DocumentObjectDetector(torch.nn.Module):
-    def __init__(self, config: Munch):
+    def __init__(self):
         super().__init__()
 
-        self.C: int = int(config.num_classes)
-        self.FPN_CHANNELS: int = int(config.fpn_channels)
-        self.BACKBONE_NAME: str = config.backbone
+        config = get_config()
+        self.num_classes: int = config.dataset.num_classes
+        self.fpn_channels: int = config.model.fpn_channels
+        self.backbone_name: str = config.model.backbone
 
-        if self.BACKBONE_NAME is None or self.BACKBONE_NAME == "":
-            warnings.warn("backbone_checkpoint is not set. Using default checkpoint.")
-            self.BACKBONE_NAME = "microsoft/dit-base"
+        if self.backbone_name is None or self.backbone_name == "":
+            warnings.warn("backbone_checkpoint is not set. Using default backbone (microsoft/dit-base).")
+            self.backbone_name = "microsoft/dit-base"
 
         # DiT backbone
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            self.backbone = BeitModel.from_pretrained(self.BACKBONE_NAME, add_pooling_layer=False)
+            self.backbone = BeitModel.from_pretrained(self.backbone_name, add_pooling_layer=False)
         self.backbone_forward = partial(self.backbone.forward, output_attentions=True, output_hidden_states=True, return_dict=True)
 
         self.num_patches_per_side: int = self.backbone.config.image_size // self.backbone.config.patch_size
@@ -77,16 +79,16 @@ class DocumentObjectDetector(torch.nn.Module):
             -1, # batch size
             len(self.fpn_layers), # number of feature maps
             self.backbone.config.hidden_size, # patch embedding size
-            self.num_patches_per_side, # number of patches along the horizontal axis #? W or H?
-            self.num_patches_per_side # number of patches along the vertical axis #? W or H?
+            self.num_patches_per_side, # number of patches along the vertical axis
+            self.num_patches_per_side # number of patches along the horizontal axis
         )
         self.fpn = torchvision.ops.FeaturePyramidNetwork(
             in_channels_list=[self.hidden_size]*len(self.fpn_layers),
-            out_channels=self.FPN_CHANNELS,
+            out_channels=self.fpn_channels,
             norm_layer=torch.nn.BatchNorm2d)
 
         # YOLOv3 head (1x1 convolutions)
-        self.yolo_head = torch.nn.Conv2d(in_channels=self.FPN_CHANNELS, out_channels=3 * (5 + self.C), kernel_size=1)
+        self.yolo_head = torch.nn.Conv2d(in_channels=self.fpn_channels, out_channels=3 * (5 + self.num_classes), kernel_size=1)
 
     def forward(self, pixel_values: Tensor):
         # Backbone forward pass
@@ -113,9 +115,9 @@ class DocumentObjectDetector(torch.nn.Module):
         for feat_map in fpn_output.values():
             feat_map_size: int = feat_map.shape[-1]
 
-            output = self.yolo_head(feat_map) # (B, 3 * (5 + self.C), feat_map_size, feat_map_size)
-            output = output.reshape(-1, 3, 5 + self.C, feat_map_size, feat_map_size) # (B, 3, 5 + self.C, feat_map_size, feat_map_size)
-            output = output.transpose(2, 4) # (B, 3, feat_map_size, feat_map_size, 5 + self.C)
+            output = self.yolo_head(feat_map) # (B, 3 * (5 + C), feat_map_size, feat_map_size)
+            output = output.reshape(-1, 3, 5 + self.num_classes, feat_map_size, feat_map_size) # (B, 3, 5 + C, feat_map_size, feat_map_size)
+            output = output.transpose(2, 4) # (B, 3, feat_map_size, feat_map_size, 5 + C)
             yolo_output.update({feat_map_size: output})
 
         return yolo_output
@@ -125,12 +127,9 @@ def test_model():
     B = 8 # batch size
     C = 11 # number of classes
 
-    if torch.cuda.is_available():
-        device = torch.device("cuda")
-    else:
-        device = torch.device("cpu")
+    device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
-    model = DocumentObjectDetector(Munch(num_classes=C, fpn_channels=512))
+    model = DocumentObjectDetector()
     model.to(device)
     model.eval()
 
