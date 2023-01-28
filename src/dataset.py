@@ -133,7 +133,7 @@ class COCODataset(Dataset):
         bboxes: list[list[float]] = augmentations["bboxes"] # List of bounding boxes (x, y, w, h)
         category_ids: list[int] = augmentations["category_ids"] # List of category IDs
 
-        # Convert bboxes back to COCOBoundingBox objects
+        # Convert bboxes back to COCOBoundingBox objects (sanity checks are performed on transformed bboxes)
         bboxes: list[COCOBoundingBox] = [
             COCOBoundingBox(*bbox, max_width=orig_width, max_height=orig_height)
             for bbox in bboxes
@@ -179,7 +179,7 @@ class COCODataset(Dataset):
                         else:
                             # An anchor for the current scale has already been assigned to a bbox
                             if anchor_similarities[anchor_idx] > self.ignore_iou_thresh:
-                                targets[S][anchor_idx, i, j, 0] = -1
+                                targets[S][anchor_idx, i, j, [0]] = -1
 
         # Extract features
         image = self.feature_extractor(image, return_tensors='pt').pixel_values
