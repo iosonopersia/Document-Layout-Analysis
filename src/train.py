@@ -23,7 +23,6 @@ def train_fn(train_loader, model, optimizer, epoch, loss_fn):
 
     accumulation_steps = hyperparams_cfg.gradient_accumulation_steps
     loss_value = 0.0
-    loss = torch.zeros(1, requires_grad=True)
 
     model.train()
     model.zero_grad()
@@ -94,7 +93,7 @@ def train_loop():
     model = DocumentObjectDetector()
     model = model.to(DEVICE)
 
-    optimizer = optim.AdamW(model.parameters(), lr=LR, weight_decay=WEIGHT_DECAY)
+    optimizer = optim.SGD(model.parameters(), lr=LR, momentum=MOMENTUM, weight_decay=WD)
     loss_fn = YoloLoss()
 
     #============WANDB===============
@@ -215,7 +214,8 @@ if __name__ == "__main__":
 
     # ========HYPERPARAMETERS========
     LR = hyperparams_cfg.learning_rate
-    WEIGHT_DECAY = hyperparams_cfg.weight_decay
+    WD = hyperparams_cfg.weight_decay
+    MOMENTUM = hyperparams_cfg.momentum
     EPOCHS = hyperparams_cfg.epochs
     ACCUMULATION_STEPS = hyperparams_cfg.gradient_accumulation_steps
 

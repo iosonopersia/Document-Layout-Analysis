@@ -24,8 +24,9 @@ model:
 hyperparameters:
     train:
         epochs: 1000
-        learning_rate: 1.0e-3
-        weight_decay: 1.0e-16
+        learning_rate: 1.0e-4
+        weight_decay: 0.01
+        momentum: 0.9
         gradient_accumulation_steps: 128
         scheduler:
             enabled: False
@@ -33,7 +34,7 @@ hyperparameters:
             gamma: 0.98
         early_stopping:
             enabled: True
-            patience: 10
+            patience: 3
             restore_best_weights: True
     test:
         confidence_threshold: 0.05
@@ -62,7 +63,7 @@ dataloader:
 
 wandb:
     enabled: True
-    watch_model: True
+    watch_model: False
     project_name: document-layout-analysis
     entity: "iosonopersia" # user or team name
     resume_run: False
