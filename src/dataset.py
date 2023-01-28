@@ -7,15 +7,20 @@ import numpy as np
 import torch
 from PIL import Image
 from torch.utils.data import Dataset
+from transformers import BeitFeatureExtractor, logging
 
+from augmentation import test_transforms, train_transforms
 from coco import COCOAnnotation, COCOBoundingBox
+from utils import get_anchors_dict, get_config
+
+logging.set_verbosity_error()
 
 
 class COCODataset(Dataset):
     def __init__(
         self,
         coco_file_path,
-        img_dir,
+        images_dir,
         anchors_dict = {},
         filter_doc_categories={},
         transform=None,
@@ -81,9 +86,9 @@ class COCODataset(Dataset):
                 self.annotations_for_image[image_id] = [annotation]
 
         # Directory containing the images
-        self.img_dir: str = os.path.abspath(img_dir)
+        self.img_dir: str = os.path.abspath(images_dir)
         if not os.path.isdir(self.img_dir):
-            raise ValueError(f"img_dir={img_dir} is not a valid directory.")
+            raise ValueError(f"images_dir={images_dir} is not a valid directory.")
 
         # Grid sizes
         self.S: list[int] = list(anchors_dict.keys()) # Grid sizes
@@ -186,3 +191,41 @@ class COCODataset(Dataset):
         intersection = min(w1, w2) * min(h1, h2)
         union = (w1 * h1) + (w2 * h2) - intersection
         return intersection / union
+
+
+feature_extractor: BeitFeatureExtractor = None
+
+def get_data(split: str = "train") -> tuple[COCODataset, torch.utils.data.DataLoader]:
+    config = get_config()
+
+    # Load feature extractor only once
+    global feature_extractor
+    if feature_extractor is None:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            model_cfg = config.model
+            feature_extractor = BeitFeatureExtractor.from_pretrained(model_cfg.backbone)
+
+    # Select config for the required split
+    if split in ["train", "val", "test"]:
+        config_dataloader = config.dataloader[split]
+    else:
+        raise ValueError("Invalid split")
+
+    # Create dataset and dataloader
+    dataset_cfg = config.dataset
+    apply_transforms = split == "train" and dataset_cfg.apply_augmentations
+    dataset = COCODataset(
+        coco_file_path=dataset_cfg[split + "_labels_file"],
+        images_dir=dataset_cfg.images_dir,
+        anchors_dict=get_anchors_dict(dataset_cfg.anchors_file),
+        filter_doc_categories=dataset_cfg.doc_categories,
+        transform=train_transforms if apply_transforms else test_transforms,
+        feature_extractor=feature_extractor
+    )
+    dataloader = torch.utils.data.DataLoader(
+        dataset,
+        **config_dataloader
+    )
+
+    return dataset, dataloader
