@@ -17,18 +17,23 @@ class COCOBoundingBox:
         Raises:
             ValueError: If the bounding box is invalid
         """
+        # ==========UNFIXABLE PROBLEMS==========
         if self.max_width < 1 or self.max_height < 1:
             raise ValueError("Max width and height must be greater than 1")
-        if self.x < 0 or self.y < 0:
-            raise ValueError("x and y must be positive")
         if self.x > self.max_width or self.y > self.max_height:
             raise ValueError("x and y must be less than the max width and height")
         if self.w < 0 or self.h < 0:
             raise ValueError("Width and height must be positive")
-        if self.w > self.max_width or self.h > self.max_height:
-            raise ValueError("Width and height must be less than the max width and height")
-        if self.x + self.w > self.max_width or self.y + self.h > self.max_height:
-            raise ValueError("x + width and y + height must be less than the max width and height")
+
+        # ===========FIXABLE PROBLEMS===========
+        if self.x < 0:
+            object.__setattr__(self, "x", 0)
+        if self.y < 0:
+            object.__setattr__(self, "y", 0)
+        if self.x + self.w > self.max_width:
+            object.__setattr__(self, "w", self.max_width - self.x)
+        if self.y + self.h > self.max_height:
+            object.__setattr__(self, "h", self.max_height - self.y)
 
     @property
     def x1(self) -> float:
