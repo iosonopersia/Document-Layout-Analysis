@@ -1,9 +1,10 @@
 ---
 
 checkpoint:
-    path: checkpoints/model.pth
     save_checkpoint: True
+    save_path: checkpoints/model.pth
     load_checkpoint: False
+    load_path: checkpoints/model.pth
 
 dataset:
     images_dir: E:/DocLayNet_core/PNG/
@@ -13,18 +14,19 @@ dataset:
     anchors_file: data/anchors.csv
     num_classes: 11
     image_size: 1025
-    doc_categories_to_keep: ['scientific_articles']
+    doc_categories: ['scientific_articles']
+    apply_augmentations: False
 
 model:
-    fpn_channels: 512
+    fpn_channels: 768
     backbone: microsoft/dit-base
 
 hyperparameters:
     train:
         epochs: 1000
         learning_rate: 1.0e-3
-        weight_decay: 1.0e-4
-        gradient_accumulation_steps: 4
+        weight_decay: 1.0e-16
+        gradient_accumulation_steps: 128
         scheduler:
             enabled: False
             scheduler_fn: ExponentialLR
@@ -44,20 +46,23 @@ dataloader:
         batch_size: 8
         num_workers: 2
         pin_memory: True
+        drop_last: True
     val:
         shuffle: False
         batch_size: 8
         num_workers: 2
         pin_memory: True
+        drop_last: False
     test:
         shuffle: False
         batch_size: 8
         num_workers: 2
         pin_memory: True
+        drop_last: False
 
 wandb:
-    enabled: False
-    watch_model: False
+    enabled: True
+    watch_model: True
     project_name: document-layout-analysis
     entity: "iosonopersia" # user or team name
     resume_run: False
