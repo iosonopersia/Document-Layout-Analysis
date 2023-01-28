@@ -65,9 +65,9 @@ class YoloLossPerScale(nn.Module):
         target_boxes = target_boxes.reshape(num_objects, 4)
 
         ious = intersection_over_union(
-            torch.cat([predicted_positions, predicted_sizes], dim=-1),
+            torch.cat([predicted_positions, predicted_sizes], dim=-1).detach(), # detach from the computation graph
             target_boxes,
-            box_format='midpoint').detach()
+            box_format='midpoint')
 
         object_loss = self.mse(
             torch.masked_select(self.sigmoid(predictions[..., OBJ]), obj_mask),
@@ -105,7 +105,8 @@ class YoloLossPerScale(nn.Module):
         no_object_loss *= self.lambda_noobj
         class_loss *= self.lambda_class
 
-        return box_loss + object_loss + no_object_loss + class_loss
+        yolo_loss = torch.stack([box_loss, object_loss, no_object_loss, class_loss], dim=0)
+        return yolo_loss.sum()
 
 
 class YoloLoss(nn.Module):
@@ -115,8 +116,9 @@ class YoloLoss(nn.Module):
 
     def forward(self, predictions: dict[int, Tensor], target: dict[int, Tensor], anchors: dict[int, Tensor]) -> Tensor:
         scale_sizes: tuple[int] = tuple(predictions.keys())
-        yolo_losses: Tensor = torch.tensor([
-            self.yolo_loss_per_scale(predictions[size], target[size], anchors[size])
-            for size in scale_sizes
-        ], dtype=torch.float32, requires_grad=True)
-        return yolo_losses.sum()
+        yolo_losses: Tensor = torch.stack(
+            [
+                self.yolo_loss_per_scale(predictions[size], target[size], anchors[size])
+                for size in scale_sizes
+            ], dim=0)
+        return yolo_losses.mean()
