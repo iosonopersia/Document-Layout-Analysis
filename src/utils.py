@@ -29,6 +29,9 @@ def get_anchors_dict(filepath: str) -> dict[int, list[float]]:
     if len(anchors) != 12:
         raise ValueError("Anchors file should contain 12 rows")
 
+    # Sort anchors by area
+    anchors = sorted(anchors, key=lambda x: x[0] * x[1]) # ascending order
+
     anchors_dict = {
         56: anchors[0:3],
         28: anchors[3:6],
