@@ -132,6 +132,7 @@ def train_loop():
     load_checkpoint_path = os.path.abspath(checkpoint_cfg.load_path)
 
     if (load_checkpoint and os.path.exists(load_checkpoint_path)):
+        print(f"[Loading checkpoint from {load_checkpoint_path}]")
         checkpoint = torch.load(load_checkpoint_path)
         start_epoch = checkpoint['epoch'] + 1 # start from the next epoch
         model.load_state_dict(checkpoint['model_state_dict'])
@@ -162,6 +163,7 @@ def train_loop():
             torch.save({
                 'epoch': epoch,
                 'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
             }, save_checkpoint_path)
 
         # ========EARLY STOPPING=========
@@ -173,6 +175,7 @@ def train_loop():
                     torch.save({
                         'epoch': epoch,
                         'model_state_dict': model.state_dict(),
+                        'optimizer_state_dict': optimizer.state_dict(),
                     }, best_weights_save_path)
             else:
                 patience_counter += 1
@@ -183,6 +186,7 @@ def train_loop():
                         torch.save({
                             'epoch': best_model['epoch'],
                             'model_state_dict': best_model['model_state_dict'],
+                            'optimizer_state_dict': best_model['optimizer_state_dict'],
                         }, save_checkpoint_path)
                         os.remove(best_weights_save_path)
                         print(f"Best model at epoch {best_model['epoch']} restored")
