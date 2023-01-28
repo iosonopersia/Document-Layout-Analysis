@@ -26,84 +26,82 @@ class YoloLossPerScale(nn.Module):
 
     def forward(self, predictions: Tensor, target: Tensor, anchor_sizes: Tensor) -> Tensor:
         """
+        Compute the YOLOv3 loss for a single scale
+
         B=Batch size, S=Grid size, A=Number of bounding boxes, C=Number of classes
-            * `predictions` is a tensor of size (B, A, S, S, 5+C)
-            * `target` is a tensor of size (B, A, S, S, 5+1) where 1 is the class index
-            * `anchors` is a tensor of size (A, 2) where 2 is width + height (normalized by the feature map size)
+
+        :param predictions: (B, A, S, S, 5+C) tensor
+        :param target: (B, A, S, S, 5+1) tensor where 1 is the class index
+        :param anchor_sizes: (A, 2) tensor where 2 is width + height (normalized by the feature map size)
+
+        :return: (1) tensor containing the YOLOv3 loss for the given predictions and targets
         """
-        # Get the obj and noobj masks (when target == -1, the prediction is ignored for the computation of the loss)
-        obj_mask = target[..., OBJ] == 1  # in paper this is Iobj_i
-        noobj_mask = target[..., OBJ] == 0  # in paper this is Inoobj_i
 
-        # ======================= #
-        #   FOR NO OBJECT LOSS    #
-        # ======================= #
-        # Objectness score should be 0 if there is no object
-        no_object_loss = self.bce(
-            torch.masked_select(predictions[..., OBJ], noobj_mask),
-            torch.masked_select(target[..., OBJ], noobj_mask)
-        )
+        # B = predictions.shape[0]
+        # A = predictions.shape[1]
+        S = predictions.shape[2]
+        C = predictions.shape[-1] - 5
+
+        # Get the obj and noobj masks
+        obj_mask = target[..., OBJ] == 1
+        noobj_mask = target[..., OBJ] == 0
+        # ignored_mask = target[..., OBJ] == -1
 
         # ==================== #
-        #   FOR OBJECT LOSS    #
+        #    NO_OBJECT LOSS    #
         # ==================== #
-        # Objectness score should be IoU(pred, tgt) if there is an object
+        predicted_no_objectness = torch.masked_select(predictions[..., OBJ], noobj_mask)
 
+        no_object_loss = self.bce(predicted_no_objectness, torch.zeros_like(predicted_no_objectness))
+
+        # ==================== #
+        #          IoU         #
+        # ==================== #
         obj_tensor_indices = torch.argwhere(obj_mask) # (num_objects, 4)
         obj_anchors_indices = obj_tensor_indices[:, 1] # (num_objects) anchor index for each object
         obj_anchors = anchor_sizes[obj_anchors_indices] # (num_objects, 2) anchor size for each object (width, height)
         obj_grid_indices = obj_tensor_indices[:, [3, 2]] # (num_objects, 2) grid cell index for each object (j, i), meaning (x, y)
-        num_objects = obj_tensor_indices.shape[0]
 
-        predicted_boxes = torch.masked_select(predictions[..., BBOX], obj_mask)
-        predicted_boxes = predicted_boxes.reshape(num_objects, 4)
+        predicted_boxes = torch.masked_select(predictions[..., BBOX], obj_mask).reshape(-1, 4)
+        target_boxes = torch.masked_select(target[..., BBOX], obj_mask).reshape(-1, 4)
+        predicted_boxes[:, [0, 1]] = self.sigmoid(predicted_boxes[:, [0, 1]]) # (Δx, Δy)
 
-        predicted_positions = obj_grid_indices + self.sigmoid(predicted_boxes[:, [0, 1]]) # (x, y)
-        predicted_sizes = obj_anchors * torch.exp(predicted_boxes[:, [2, 3]]) # (width, height)
+        iou_predicted_boxes = predicted_boxes.detach().clone()
+        iou_predicted_boxes[:, [0, 1]] = obj_grid_indices + iou_predicted_boxes[:, [0, 1]] # (x, y)
+        iou_predicted_boxes[:, [2, 3]] = obj_anchors * torch.exp(iou_predicted_boxes[:, [2, 3]]) # (width, height)
 
-        target_boxes = torch.masked_select(target[..., BBOX], obj_mask)
-        target_boxes = target_boxes.reshape(num_objects, 4)
+        ious = intersection_over_union(iou_predicted_boxes, target_boxes, box_format='midpoint')
 
-        ious = intersection_over_union(
-            torch.cat([predicted_positions, predicted_sizes], dim=-1).detach(), # detach from the computation graph
-            target_boxes,
-            box_format='midpoint')
+        # ==================== #
+        #      OBJECT LOSS     #
+        # ==================== #
+        predicted_objectness = torch.masked_select(predictions[..., OBJ], obj_mask)
 
-        object_loss = self.mse(
-            torch.masked_select(self.sigmoid(predictions[..., OBJ]), obj_mask),
-            ious
-        )
+        object_loss = self.bce(predicted_objectness, ious)
 
-        # ======================== #
-        #   FOR BOX COORDINATES    #
-        # ======================== #
-        # The box coordinates should be close to the target box coordinates
-        # The box dimensions should be close to the target box dimensions
-        predicted_boxes[:, [0, 1]] = self.sigmoid(predicted_boxes[:, [0, 1]]) # x, y adjustments
-
-        target_boxes[:, [0, 1]] = target_boxes[:, [0, 1]] - obj_grid_indices # x, y adjustments
+        # ==================== #
+        #       BOX LOSS       #
+        # ==================== #
+        target_boxes[:, [0, 1]] = target_boxes[:, [0, 1]] - obj_grid_indices # (Δx, Δy)
         target_boxes[:, [2, 3]] = torch.log(1e-16 + target_boxes[:, [2, 3]] / obj_anchors) # width, height adjustments
 
-        box_loss = self.mse(
-            predicted_boxes,
-            target_boxes
-        )
+        box_loss = self.mse(predicted_boxes, target_boxes)
 
-        # ================== #
-        #   FOR CLASS LOSS   #
-        # ================== #
-        # The class prediction should be close to the target class
-        class_loss = self.entropy(
-            torch.masked_select(predictions[..., CLS_PRED], obj_mask).reshape(-1, len(CLS_PRED)),
-            torch.masked_select(target[..., CLS_TGT], obj_mask).long())
+        # ==================== #
+        #      CLASS LOSS      #
+        # ==================== #
+        predicted_classes = torch.masked_select(predictions[..., CLS_PRED], obj_mask).reshape(-1, C)
+        target_classes = torch.masked_select(target[..., CLS_TGT], obj_mask).long()
 
-        # ================== #
-        #     TOTAL LOSS     #
-        # ================== #
-        box_loss *= self.lambda_box
-        object_loss *= self.lambda_obj
-        no_object_loss *= self.lambda_noobj
-        class_loss *= self.lambda_class
+        class_loss = self.entropy(predicted_classes, target_classes)
+
+        # ==================== #
+        #      TOTAL LOSS      #
+        # ==================== #
+        box_loss *= 10
+        # object_loss *= 1
+        no_object_loss *= 10
+        # class_loss *= 1
 
         yolo_loss = torch.stack([box_loss, object_loss, no_object_loss, class_loss], dim=0)
         return yolo_loss.sum()
