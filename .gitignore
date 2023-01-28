@@ -2,8 +2,10 @@
 .DLA_env
 .DLA_env_linux
 
-# Datasets
+# Data folders
 data
+checkpoints
+wandb
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
