@@ -37,9 +37,8 @@ class DocumentObjectDetector(torch.nn.Module):
         self.num_hidden_layers: int = self.backbone.config.num_hidden_layers
         self.hidden_size: int = self.backbone.config.hidden_size
 
-        # Feature map rescalers
-        # conv_output_size = (input_size - kernel_size + 2 * padding) / stride + 1
-        # conv_transpose_output_size = (input_size - 1) * stride - 2 * padding + kernel_size + output_padding
+        # Feature map rescalers (as implemented by the authors of the DiT paper)
+        # See https://github.com/microsoft/unilm/blob/4dfdda9fbe950c73616c65efc5b7f6b1a3d2a60a/dit/object_detection/ditod/deit.py#L262-L275
         self.rescalers = torch.nn.ModuleList([
             # 4x upscaling
             torch.nn.Sequential(
@@ -48,6 +47,8 @@ class DocumentObjectDetector(torch.nn.Module):
                     out_channels=self.hidden_size,
                     kernel_size=2,
                     stride=2),
+                torch.nn.BatchNorm2d(num_features=self.hidden_size),
+                torch.nn.GELU(),
                 torch.nn.ConvTranspose2d(
                     in_channels=self.hidden_size,
                     out_channels=self.hidden_size,
