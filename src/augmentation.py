@@ -33,12 +33,12 @@ train_transforms = A.Compose(
                     pad_val=(255, 255, 255)),
             ],
             p=0.8),
-        A.Posterize(num_bits=6, p=0.05),
-        A.ToGray(p=0.05),
+        A.ToGray(p=0.2),
         A.ToFloat(max_value=255),
         ToTensorV2(),
     ],
     bbox_params=A.BboxParams(format='coco', min_visibility=0.3, label_fields=['category_ids']),
+    p=0.3, # ~30% of the images will be transformed
 )
 
 test_transforms = A.Compose(
