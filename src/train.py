@@ -147,6 +147,11 @@ def train_loop():
 
     # ===========TRAINING============
     for epoch in range(start_epoch, EPOCHS):
+        if epoch < hyperparams_cfg.frozen_epochs:
+            model.freeze_backbone()
+        else:
+            model.unfreeze_backbone()
+
         train_loss = train_fn(train_loader, model, optimizer, epoch, loss_fn)
         val_loss = eval_fn(eval_loader, model, loss_fn)
 

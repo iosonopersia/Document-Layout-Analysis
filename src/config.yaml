@@ -28,6 +28,7 @@ hyperparameters:
         weight_decay: 0.01
         momentum: 0.9
         gradient_accumulation_steps: 128
+        frozen_epochs: 2
         scheduler:
             enabled: False
             scheduler_fn: ExponentialLR
