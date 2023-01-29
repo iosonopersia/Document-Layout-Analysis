@@ -29,6 +29,10 @@ hyperparameters:
         momentum: 0.9
         gradient_accumulation_steps: 128
         frozen_epochs: 2
+        gradient_clip:
+            enabled: True
+            max_grad_norm: 1.0
+            grad_norm_type: 2 # Euclidean norm
         scheduler:
             enabled: False
             scheduler_fn: ExponentialLR

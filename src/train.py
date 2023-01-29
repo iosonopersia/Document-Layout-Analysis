@@ -22,6 +22,7 @@ def train_fn(train_loader, model, optimizer, epoch, loss_fn):
     loop.set_postfix(loss=0.0)
 
     accumulation_steps = hyperparams_cfg.gradient_accumulation_steps
+    gradient_clip_cfg = hyperparams_cfg.gradient_clip
     epoch_loss = 0.0
 
     model.train()
@@ -44,6 +45,12 @@ def train_fn(train_loader, model, optimizer, epoch, loss_fn):
         epoch_loss += loss.item()
 
         if ((i + 1) % accumulation_steps == 0) or ((i + 1) == num_batches):
+            # Gradient clipping
+            if gradient_clip_cfg.enabled:
+                torch.nn.utils.clip_grad_norm_(
+                    parameters=model.parameters(),
+                    max_norm=gradient_clip_cfg.max_grad_norm,
+                    norm_type=gradient_clip_cfg.grad_norm_type)
             # Update parameters
             optimizer.step()
             # Reset gradients
