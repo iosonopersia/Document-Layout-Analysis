@@ -6,8 +6,7 @@ from yolo_utils import intersection_over_union
 
 OBJ = list(range(0, 1))
 BBOX = list(range(1, 5))
-CLS_PRED = list(range(5, 16))
-CLS_TGT = list(range(5, 6))
+CLS = list(range(5, 16))
 
 
 class YoloLossPerScale(nn.Module):
@@ -15,14 +14,7 @@ class YoloLossPerScale(nn.Module):
         super().__init__()
         self.mse = nn.MSELoss()
         self.bce = nn.BCEWithLogitsLoss()
-        self.entropy = nn.CrossEntropyLoss()
         self.sigmoid = nn.Sigmoid()
-
-        # Multiplicative weights for each part of the loss
-        self.lambda_class = 1
-        self.lambda_noobj = 10
-        self.lambda_obj = 1
-        self.lambda_box = 10
 
     def forward(self, predictions: Tensor, target: Tensor, anchor_sizes: Tensor) -> Tensor:
         """
@@ -30,8 +22,8 @@ class YoloLossPerScale(nn.Module):
 
         B=Batch size, S=Grid size, A=Number of bounding boxes, C=Number of classes
 
-        :param predictions: (B, A, S, S, 5+C) tensor
-        :param target: (B, A, S, S, 5+1) tensor where 1 is the class index
+        :param predictions: (B, A, S, S, 5+C) tensor containing the predictions
+        :param target: (B, A, S, S, 5+C) tensor containing the targets
         :param anchor_sizes: (A, 2) tensor where 2 is width + height (normalized by the feature map size)
 
         :return: (1) tensor containing the YOLOv3 loss for the given predictions and targets
@@ -83,17 +75,17 @@ class YoloLossPerScale(nn.Module):
         #       BOX LOSS       #
         # ==================== #
         target_boxes[:, [0, 1]] = target_boxes[:, [0, 1]] - obj_grid_indices # (Δx, Δy)
-        target_boxes[:, [2, 3]] = torch.log(1e-16 + target_boxes[:, [2, 3]] / obj_anchors) # width, height adjustments
+        target_boxes[:, [2, 3]] = torch.log(1e-6 + target_boxes[:, [2, 3]] / obj_anchors) # width, height adjustments
 
         box_loss = self.mse(predicted_boxes, target_boxes)
 
         # ==================== #
         #      CLASS LOSS      #
         # ==================== #
-        predicted_classes = torch.masked_select(predictions[..., CLS_PRED], obj_mask).reshape(-1, C)
-        target_classes = torch.masked_select(target[..., CLS_TGT], obj_mask).long()
+        predicted_classes = torch.masked_select(predictions[..., CLS], obj_mask).reshape(-1, C)
+        target_classes = torch.masked_select(target[..., CLS], obj_mask).reshape(-1, C)
 
-        class_loss = self.entropy(predicted_classes, target_classes)
+        class_loss = self.bce(predicted_classes, target_classes)
 
         # ==================== #
         #      TOTAL LOSS      #
@@ -104,7 +96,7 @@ class YoloLossPerScale(nn.Module):
         # class_loss *= 1
 
         yolo_loss = torch.stack([box_loss, object_loss, no_object_loss, class_loss], dim=0)
-        return yolo_loss.sum()
+        return yolo_loss
 
 
 class YoloLoss(nn.Module):

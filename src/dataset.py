@@ -45,7 +45,7 @@ class COCODataset(Dataset):
         self.id_to_categories: dict[int, str] = {
             category['id']: category['name']
             for category in coco_dataset['categories']}
-        self.num_categories: int = len(self.id_to_categories)
+        self.C: int = len(self.id_to_categories)
 
         # Image ID to filename (keeps only images with doc_category in filter_doc_categories)
         self.id_to_image_filename: dict[int, str] = {
@@ -143,8 +143,7 @@ class COCODataset(Dataset):
         # visualize(image.permute(1, 2, 0).numpy(), bboxes, category_ids, self.id_to_categories)
 
         # Create targets
-        # 6 = 1 objectness score + 4 bbox coords + 1 class label (p_obj, x, y, w, h, class)
-        targets = {S: torch.zeros((self.num_anchors_per_scale, S, S, 6), dtype=torch.float32) for S in self.S}
+        targets = {S: torch.zeros((self.num_anchors_per_scale, S, S, 5+self.C), dtype=torch.float32) for S in self.S}
         for bbox, class_label in zip(bboxes, category_ids):
             bbox = bbox.to_normalized()
             x, y, width, height = bbox.x_center, bbox.y_center, bbox.w, bbox.h # Normalized to [0, 1]
@@ -165,16 +164,12 @@ class COCODataset(Dataset):
 
                     if is_anchor_available:
                         if not is_anchor_assigned:
-                            # X and Y coordinates of the center of the bbox, scaled to the size of the current feature map
-                            x_scaled, y_scaled = x * S, y * S
+                            target_tensor = torch.zeros((5+self.C), dtype=torch.float32)
+                            target_tensor[0] = 1 # Objectness score
+                            target_tensor[1:5] = S * torch.tensor([x, y, width, height], dtype=torch.float32) # Bbox coords
+                            target_tensor[5+class_label-1] = 1 # Class label (subtract 1 to make class labels start from 0)
 
-                            # Width and height of the bbox, scaled to the size of the current feature map
-                            width_scaled, height_scaled = width * S, height * S,
-
-                            targets[S][anchor_idx, i, j, :] = torch.tensor(
-                                [1, x_scaled, y_scaled, width_scaled, height_scaled, (class_label - 1)], # Subtract 1 to make class labels start from 0
-                                dtype=torch.float32)
-
+                            targets[S][anchor_idx, i, j, :] = target_tensor
                             is_anchor_assigned = True
                         else:
                             # An anchor for the current scale has already been assigned to a bbox
