@@ -22,7 +22,7 @@ def train_fn(train_loader, model, optimizer, epoch, loss_fn):
     loop.set_postfix(loss=0.0)
 
     accumulation_steps = hyperparams_cfg.gradient_accumulation_steps
-    loss_value = 0.0
+    epoch_loss = 0.0
 
     model.train()
     model.zero_grad()
@@ -38,23 +38,23 @@ def train_fn(train_loader, model, optimizer, epoch, loss_fn):
 
         # Loss computation
         loss = loss_fn(predictions, targets, SCALED_ANCHORS)
-        loss = loss / accumulation_steps
 
         # Backward pass
-        loss.backward() # accumulate gradients
+        (loss / accumulation_steps).backward() # accumulate gradients
+        epoch_loss += loss.item()
+
         if ((i + 1) % accumulation_steps == 0) or ((i + 1) == num_batches):
             # Update parameters
             optimizer.step()
             # Reset gradients
             model.zero_grad()
 
-        # Update progress bar
-        loss_value += loss.item() * accumulation_steps
-        loop.set_postfix(loss=loss_value / (i+1))
-        if wandb_cfg.enabled:
-            wandb.log({'Train/Running_loss': loss_value / (i+1)})
+            # Update progress bar
+            loop.set_postfix(loss=epoch_loss / (i+1))
+            if wandb_cfg.enabled:
+                wandb.log({'Train/Running_loss': epoch_loss / (i+1)})
 
-    return loss_value / num_batches
+    return epoch_loss / num_batches
 
 
 def eval_fn(eval_loader, model, loss_fn):
@@ -62,7 +62,7 @@ def eval_fn(eval_loader, model, loss_fn):
     loop.set_description(f"Validation")
     loop.set_postfix(loss=0.0)
 
-    loss_value = 0.0
+    eval_loss = 0.0
 
     model.eval()
     num_batches = len(eval_loader)
@@ -76,12 +76,12 @@ def eval_fn(eval_loader, model, loss_fn):
             for key in predictions.keys():
                 predictions[key] = predictions[key].cpu()
             loss = loss_fn(predictions, targets, SCALED_ANCHORS)
-            loss_value += loss.item()
+            eval_loss += loss.item()
 
             # Update progress bar
-            loop.set_postfix(loss=loss_value / (i+1))
+            loop.set_postfix(loss=eval_loss / (i+1))
 
-    return loss_value / num_batches
+    return eval_loss / num_batches
 
 
 def train_loop():
@@ -123,15 +123,13 @@ def train_loop():
 
     #===========CHECKPOINT===========
     checkpoint_cfg = config.checkpoint
-    save_checkpoint = checkpoint_cfg.save_checkpoint
-    save_checkpoint_path = os.path.abspath(checkpoint_cfg.save_path)
-    os.makedirs(os.path.dirname(save_checkpoint_path), exist_ok=True) # Create folder if it doesn't exist
+    if checkpoint_cfg.save_checkpoint:
+        save_checkpoint_path = os.path.abspath(checkpoint_cfg.save_path)
+        os.makedirs(os.path.dirname(save_checkpoint_path), exist_ok=True) # Create folder if it doesn't exist
 
     start_epoch = 0
-    load_checkpoint = checkpoint_cfg.load_checkpoint
     load_checkpoint_path = os.path.abspath(checkpoint_cfg.load_path)
-
-    if (load_checkpoint and os.path.exists(load_checkpoint_path)):
+    if (checkpoint_cfg.load_checkpoint and os.path.exists(load_checkpoint_path)):
         print(f"[Loading checkpoint from {load_checkpoint_path}]")
         checkpoint = torch.load(load_checkpoint_path)
         start_epoch = checkpoint['epoch'] + 1 # start from the next epoch
@@ -164,7 +162,7 @@ def train_loop():
             })
 
         # ===========CHECKPOINT==========
-        if save_checkpoint:
+        if checkpoint_cfg.save_checkpoint:
             torch.save({
                 'epoch': epoch,
                 'model_state_dict': model.state_dict(),
