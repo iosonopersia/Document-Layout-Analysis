@@ -8,7 +8,7 @@ import wandb
 
 from tqdm import tqdm
 
-from dataset import get_data
+from dataset import get_dataloader
 from loss import YoloLoss
 from model import DocumentObjectDetector
 from utils import get_anchors_dict, get_config
@@ -86,8 +86,8 @@ def eval_fn(eval_loader, model, loss_fn):
 
 def train_loop():
     # ========== DATASET=============
-    train_dataset, train_loader = get_data("train")
-    eval_dataset, eval_loader = get_data("val")
+    train_loader = get_dataloader("train")
+    eval_loader = get_dataloader("val")
 
     # ===========MODEL===============
     model = DocumentObjectDetector()

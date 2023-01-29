@@ -195,7 +195,7 @@ class COCODataset(Dataset):
 
 feature_extractor: BeitFeatureExtractor = None
 
-def get_data(split: str = "train") -> tuple[COCODataset, torch.utils.data.DataLoader]:
+def get_dataloader(split: str = "train") -> tuple[COCODataset, torch.utils.data.DataLoader]:
     config = get_config()
 
     # Load feature extractor only once
@@ -228,4 +228,4 @@ def get_data(split: str = "train") -> tuple[COCODataset, torch.utils.data.DataLo
         **config_dataloader
     )
 
-    return dataset, dataloader
+    return dataloader
