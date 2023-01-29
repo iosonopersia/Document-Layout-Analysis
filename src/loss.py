@@ -88,12 +88,11 @@ class YoloLossPerScale(nn.Module):
         class_loss = self.bce(predicted_classes, target_classes)
 
         # ==================== #
-        #      TOTAL LOSS      #
+        #       YOLO LOSS      #
         # ==================== #
-        box_loss *= 10
-        # object_loss *= 1
-        no_object_loss *= 10
-        # class_loss *= 1
+        no_object_loss *= 0.5 # λnoobj
+        box_loss *= 5.0 # λcoord
+
 
         yolo_loss = torch.stack([box_loss, object_loss, no_object_loss, class_loss], dim=0)
         return yolo_loss
