@@ -36,6 +36,7 @@ class DocumentObjectDetector(torch.nn.Module):
         self.num_patches: int = self.num_patches_per_side ** 2
         self.num_hidden_layers: int = self.backbone.config.num_hidden_layers
         self.hidden_size: int = self.backbone.config.hidden_size
+        self.feature_maps_activation = torch.nn.GELU()
 
         # Feature map rescalers (as implemented by the authors of the DiT paper)
         # See https://github.com/microsoft/unilm/blob/4dfdda9fbe950c73616c65efc5b7f6b1a3d2a60a/dit/object_detection/ditod/deit.py#L262-L275
@@ -54,19 +55,27 @@ class DocumentObjectDetector(torch.nn.Module):
                     out_channels=self.hidden_size,
                     kernel_size=2,
                     stride=2),
+                torch.nn.BatchNorm2d(num_features=self.hidden_size),
+                torch.nn.GELU(),
             ),
             # 2x upscaling
-            torch.nn.ConvTranspose2d(
-                in_channels=self.hidden_size,
-                out_channels=self.hidden_size,
-                kernel_size=2,
-                stride=2),
+            torch.nn.Sequential(
+                torch.nn.ConvTranspose2d(
+                    in_channels=self.hidden_size,
+                    out_channels=self.hidden_size,
+                    kernel_size=2,
+                    stride=2),
+                torch.nn.BatchNorm2d(num_features=self.hidden_size),
+                torch.nn.GELU(),
+            ),
             # identity
             torch.nn.Identity(),
             # 2x downscaling
-            torch.nn.MaxPool2d(
-                kernel_size=2,
-                stride=2),
+            torch.nn.Sequential(
+                torch.nn.MaxPool2d(kernel_size=2, stride=2),
+                torch.nn.BatchNorm2d(num_features=self.hidden_size),
+                torch.nn.GELU(),
+            ),
         ])
 
         self.fpn_layers: list[int] = [
@@ -103,11 +112,17 @@ class DocumentObjectDetector(torch.nn.Module):
         feature_maps = feature_maps[:, :, 1:, :] # remove cls token (B, 4, 196, 1024)
         feature_maps = feature_maps.transpose(2, 3) # (B, 4, 1024, 196)
         feature_maps = feature_maps.reshape(self.FEAT_MAPS_SHAPE) # (B, 4, 1024, 14, 14)
-        fpn_input: dict[str, Tensor] = OrderedDict(
-            {
-                self.fpn_layer_names[i]: self.rescalers[i](feature_maps[:, i, ...])
-                for i in range(len(self.fpn_layers))
-            })
+
+        # Apply non-linear activation
+        feature_maps = self.feature_maps_activation(feature_maps)
+
+        fpn_input: dict[str, Tensor] = OrderedDict()
+        for i in range(len(self.fpn_layers)):
+            feat_map = feature_maps[:, i, ...] # (B, 1024, 14, 14)
+            layer_name: str = self.fpn_layer_names[i]
+
+            feat_map = self.rescalers[i](feat_map) # apply rescaling
+            fpn_input[layer_name] = feat_map
 
         # FPN forward pass
         fpn_output: dict[str, Tensor] = self.fpn(fpn_input)
