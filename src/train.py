@@ -1,4 +1,3 @@
-import os
 from collections import OrderedDict
 
 import torch
@@ -99,14 +98,24 @@ def train_loop():
     # ===========MODEL===============
     model = DocumentObjectDetector()
     model = model.to(DEVICE)
+    loss_fn = YoloLoss()
 
+    # ===========OPTIMIZER===========
+    model.freeze_backbone() # marks backbone parameters as not trainable
+    frozen_optimizer = optim.SGD(
+        params=filter(lambda p: p.requires_grad, model.parameters()),
+        lr=FROZEN_LR,
+        momentum=MOMENTUM,
+        weight_decay=WD,
+        nesterov=True)
+
+    model.unfreeze_backbone() # marks all parameters as trainable
     optimizer = optim.SGD(
         params=model.parameters(),
         lr=LR,
         momentum=MOMENTUM,
         weight_decay=WD,
         nesterov=True)
-    loss_fn = YoloLoss()
 
     #============WANDB===============
     wandb_logger.start_new_run(run_config=config)
@@ -116,16 +125,20 @@ def train_loop():
         log_freq=len(train_loader) // ACCUMULATION_STEPS)
 
     #===========CHECKPOINT===========
-    start_epoch: int = checkpoint_handler.restore(model, optimizer)
+    start_epoch, checkpoint_restored = checkpoint_handler.restore(model, optimizer)
+    if checkpoint_restored and start_epoch < FROZEN_EPOCHS:
+        raise ValueError("Restoring checkpoint from a frozen epoch is not supported.")
 
     # ===========TRAINING============
     for epoch in range(start_epoch, EPOCHS):
-        if epoch < hyperparams_cfg.frozen_epochs:
+        if epoch < FROZEN_EPOCHS:
             model.freeze_backbone()
+            epoch_optimizer = frozen_optimizer
         else:
             model.unfreeze_backbone()
+            epoch_optimizer = optimizer
 
-        train_loss = train_fn(train_loader, model, optimizer, epoch, loss_fn)
+        train_loss = train_fn(train_loader, model, epoch_optimizer, epoch, loss_fn)
         val_loss = eval_fn(eval_loader, model, loss_fn)
 
         # ============WANDB==============
@@ -137,7 +150,7 @@ def train_loop():
 
         # ===========CHECKPOINT==========
         model_state_dict = model.state_dict()
-        optimizer_state_dict = optimizer.state_dict()
+        optimizer_state_dict = epoch_optimizer.state_dict()
         checkpoint_handler.save(epoch, model_state_dict, optimizer_state_dict)
 
         # ========EARLY STOPPING=========
@@ -158,6 +171,7 @@ if __name__ == "__main__":
     dataset_cfg = config.dataset
     model_cfg = config.model
     hyperparams_cfg = config.hyperparameters.train
+    finetuning_cfg = hyperparams_cfg.finetuning
 
     wandb_logger = WandBLogger(config.wandb)
     checkpoint_handler = CheckpointHandler(config.checkpoint)
@@ -171,6 +185,9 @@ if __name__ == "__main__":
     })
 
     # ========HYPERPARAMETERS========
+    FROZEN_EPOCHS = finetuning_cfg.frozen_epochs
+    FROZEN_LR = finetuning_cfg.frozen_learning_rate
+
     LR = hyperparams_cfg.learning_rate
     WD = hyperparams_cfg.weight_decay
     MOMENTUM = hyperparams_cfg.momentum
