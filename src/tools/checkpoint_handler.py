@@ -29,24 +29,26 @@ class CheckpointHandler():
             if not os.path.isfile(self.load_path):
                 raise FileNotFoundError(f"CheckpointHandler: Checkpoint file {self.load_path} does not exist")
 
-    def save(self, epoch: int, model_state_dict: dict, optimizer_state_dict: dict, save_path: Optional[str] = None) -> None:
+    def save(self, epoch: int, model_state_dict: dict, optimizer_state_dict: dict, is_frozen_epoch: bool, save_path: Optional[str] = None) -> None:
         save_path = save_path if save_path is not None else self.save_path
         if self.save_checkpoint:
             torch.save({
                 'epoch': epoch,
                 'model_state_dict': model_state_dict,
                 'optimizer_state_dict': optimizer_state_dict,
+                'is_frozen_epoch': is_frozen_epoch
             }, save_path)
 
-    def restore(self, model: Any, optimizer: Any) -> tuple[int, bool]:
+    def restore(self, model: Any, optimizer: Any) -> int:
         start_epoch: int = 0
-        checkpoint_restored: bool = False
         if self.load_checkpoint:
             print(f"CheckpointHandler: restoring checkpoint from {self.load_path}")
             checkpoint = torch.load(self.load_path)
-            start_epoch = checkpoint['epoch'] + 1 # start from the next epoch
-            model.load_state_dict(checkpoint['model_state_dict'])
-            optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-            checkpoint_restored = True
+            if checkpoint['is_frozen_epoch']:
+                raise ValueError("CheckpointHandler: Cannot restore checkpoint from frozen epoch")
+            else:
+                start_epoch = checkpoint['epoch'] + 1 # start from the next epoch
+                model.load_state_dict(checkpoint['model_state_dict'])
+                optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 
-        return start_epoch, checkpoint_restored
+        return start_epoch

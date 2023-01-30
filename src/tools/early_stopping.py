@@ -35,7 +35,7 @@ class EarlyStopping:
             self.best_save_path = os.path.join(os.path.dirname(checkpoint_handler.save_path), f'best_weights.pth')
 
     @only_if_enabled
-    def update(self, epoch: int, val_loss: float, model_state_dict: dict, optimizer_state_dict: dict) -> bool:
+    def update(self, epoch: int, val_loss: float, model_state_dict: dict, optimizer_state_dict: dict, is_frozen_epoch: bool) -> bool:
         if val_loss < self.best_val_loss:
             self.best_epoch = epoch
             self.best_val_loss = val_loss
@@ -45,6 +45,7 @@ class EarlyStopping:
                     epoch,
                     model_state_dict,
                     optimizer_state_dict,
+                    is_frozen_epoch,
                     save_path=self.best_save_path)
 
         delta = epoch - self.best_epoch # epochs without improvement
@@ -58,7 +59,8 @@ class EarlyStopping:
                 self.checkpoint_handler.save(
                     best_model['epoch'],
                     best_model['model_state_dict'],
-                    best_model['optimizer_state_dict'])
+                    best_model['optimizer_state_dict'],
+                    best_model['is_frozen_epoch'])
                 os.remove(self.best_save_path)
 
         return stop

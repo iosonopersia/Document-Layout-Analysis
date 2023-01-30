@@ -125,13 +125,12 @@ def train_loop():
         log_freq=len(train_loader) // ACCUMULATION_STEPS)
 
     #===========CHECKPOINT===========
-    start_epoch, checkpoint_restored = checkpoint_handler.restore(model, optimizer)
-    if checkpoint_restored and start_epoch < FROZEN_EPOCHS:
-        raise ValueError("Restoring checkpoint from a frozen epoch is not supported.")
+    start_epoch = checkpoint_handler.restore(model, optimizer)
 
     # ===========TRAINING============
     for epoch in range(start_epoch, EPOCHS):
-        if epoch < FROZEN_EPOCHS:
+        is_frozen_epoch: bool = epoch < FROZEN_EPOCHS
+        if is_frozen_epoch:
             model.freeze_backbone()
             epoch_optimizer = frozen_optimizer
         else:
@@ -151,10 +150,10 @@ def train_loop():
         # ===========CHECKPOINT==========
         model_state_dict = model.state_dict()
         optimizer_state_dict = epoch_optimizer.state_dict()
-        checkpoint_handler.save(epoch, model_state_dict, optimizer_state_dict)
+        checkpoint_handler.save(epoch, model_state_dict, optimizer_state_dict, is_frozen_epoch)
 
         # ========EARLY STOPPING=========
-        stop: bool = early_stopping.update(epoch, val_loss, model_state_dict, optimizer_state_dict)
+        stop: bool = early_stopping.update(epoch, val_loss, model_state_dict, optimizer_state_dict, is_frozen_epoch)
         if stop:
             break
 
