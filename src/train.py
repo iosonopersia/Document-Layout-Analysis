@@ -100,7 +100,12 @@ def train_loop():
     model = DocumentObjectDetector()
     model = model.to(DEVICE)
 
-    optimizer = optim.SGD(model.parameters(), lr=LR, momentum=MOMENTUM, weight_decay=WD)
+    optimizer = optim.SGD(
+        params=model.parameters(),
+        lr=LR,
+        momentum=MOMENTUM,
+        weight_decay=WD,
+        nesterov=True)
     loss_fn = YoloLoss()
 
     #============WANDB===============
