@@ -38,9 +38,9 @@ hyperparameters:
             scheduler_fn: ExponentialLR
             gamma: 0.98
         early_stopping:
-            enabled: True
+            enabled: False
             patience: 3
-            restore_best_weights: True
+            restore_best: True
     test:
         confidence_threshold: 0.05
         map_iou_threshold: 0.5

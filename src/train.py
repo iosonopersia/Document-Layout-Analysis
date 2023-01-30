@@ -9,6 +9,7 @@ from dataset import get_dataloader
 from loss import YoloLoss
 from model import DocumentObjectDetector
 from tools.checkpoint_handler import CheckpointHandler
+from tools.early_stopping import EarlyStopping
 from tools.wandb_logger import WandBLogger
 from utils import get_anchors_dict, get_config
 
@@ -115,15 +116,7 @@ def train_loop():
         log_freq=len(train_loader) // ACCUMULATION_STEPS)
 
     #===========CHECKPOINT===========
-    checkpoint_cfg = config.checkpoint
     start_epoch: int = checkpoint_handler.restore(model, optimizer)
-
-    # ========EARLY STOPPING=========
-    early_stopping_cfg = hyperparams_cfg.early_stopping
-    if early_stopping_cfg.enabled:
-        best_weights_save_path = os.path.join(os.path.dirname(save_checkpoint_path), f'best_weights.pth')
-        min_loss_val = float('inf')
-        patience_counter = 0
 
     # ===========TRAINING============
     for epoch in range(start_epoch, EPOCHS):
@@ -143,32 +136,14 @@ def train_loop():
         })
 
         # ===========CHECKPOINT==========
-        checkpoint_handler.save(epoch, model.state_dict(), optimizer.state_dict())
+        model_state_dict = model.state_dict()
+        optimizer_state_dict = optimizer.state_dict()
+        checkpoint_handler.save(epoch, model_state_dict, optimizer_state_dict)
 
         # ========EARLY STOPPING=========
-        if early_stopping_cfg.enabled:
-            if val_loss < min_loss_val:
-                min_loss_val = val_loss
-                patience_counter = 0
-                if early_stopping_cfg.restore_best_weights:
-                    checkpoint_handler.save(
-                        epoch,
-                        model.state_dict(),
-                        optimizer.state_dict(),
-                        save_path=best_weights_save_path)
-            else:
-                patience_counter += 1
-                if patience_counter >= early_stopping_cfg.patience:
-                    print(f"Early stopping: patience {early_stopping_cfg.patience} reached")
-                    if early_stopping_cfg.restore_best_weights:
-                        best_model = torch.load(best_weights_save_path)
-                        checkpoint_handler.save(
-                            best_model['epoch'],
-                            best_model['model_state_dict'],
-                            best_model['optimizer_state_dict'])
-                        os.remove(best_weights_save_path)
-                        print(f"Best model at epoch {best_model['epoch']} restored")
-                    break
+        stop: bool = early_stopping.update(epoch, val_loss, model_state_dict, optimizer_state_dict)
+        if stop:
+            break
 
     wandb_logger.stop_run()
 
@@ -186,6 +161,7 @@ if __name__ == "__main__":
 
     wandb_logger = WandBLogger(config.wandb)
     checkpoint_handler = CheckpointHandler(config.checkpoint)
+    early_stopping = EarlyStopping(hyperparams_cfg.early_stopping, checkpoint_handler)
 
     # ===========DATASET==============
     ANCHORS_DICT = get_anchors_dict(dataset_cfg.anchors_file)
