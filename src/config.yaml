@@ -69,7 +69,8 @@ dataloader:
 wandb:
     enabled: True
     watch_model: False
-    project_name: document-layout-analysis
+    watch_model_type: 'all' # 'gradients', 'parameters', 'all', None
+    project: document-layout-analysis
     entity: "iosonopersia" # user or team name
     resume_run: False
     resume_run_id: "" # wandb run id to resume

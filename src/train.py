@@ -1,17 +1,15 @@
 import os
 from collections import OrderedDict
-from datetime import datetime
 
 import torch
 import torch.optim as optim
-import wandb
-
 from tqdm import tqdm
 
 from dataset import get_dataloader
 from loss import YoloLoss
 from model import DocumentObjectDetector
 from utils import get_anchors_dict, get_config
+from tools.wandb_logger import WandBLogger
 
 torch.backends.cudnn.benchmark = True # improves training speed if input size doesn't change
 
@@ -21,7 +19,6 @@ def train_fn(train_loader, model, optimizer, epoch, loss_fn):
     loop.set_description(f"Epoch [{epoch + 1}/{EPOCHS}]")
     loop.set_postfix(loss=0.0)
 
-    accumulation_steps = hyperparams_cfg.gradient_accumulation_steps
     gradient_clip_cfg = hyperparams_cfg.gradient_clip
     epoch_loss = 0.0
 
@@ -41,10 +38,10 @@ def train_fn(train_loader, model, optimizer, epoch, loss_fn):
         loss = loss_fn(predictions, targets, SCALED_ANCHORS)
 
         # Backward pass
-        (loss / accumulation_steps).backward() # accumulate gradients
+        (loss / ACCUMULATION_STEPS).backward() # accumulate gradients
         epoch_loss += loss.item()
 
-        if ((i + 1) % accumulation_steps == 0) or ((i + 1) == num_batches):
+        if ((i + 1) % ACCUMULATION_STEPS == 0) or ((i + 1) == num_batches):
             # Gradient clipping
             if gradient_clip_cfg.enabled:
                 torch.nn.utils.clip_grad_norm_(
@@ -58,8 +55,9 @@ def train_fn(train_loader, model, optimizer, epoch, loss_fn):
 
             # Update progress bar
             loop.set_postfix(loss=epoch_loss / (i+1))
-            if wandb_cfg.enabled:
-                wandb.log({'Train/Running_loss': epoch_loss / (i+1)})
+
+            wandb_logger.log({'Train/Running_loss': epoch_loss / (i+1)})
+            wandb_logger.step()
 
     return epoch_loss / num_batches
 
@@ -109,29 +107,11 @@ def train_loop():
     loss_fn = YoloLoss()
 
     #============WANDB===============
-    if wandb_cfg.enabled:
-        entity_name = wandb_cfg.entity
-        resume_run = wandb_cfg.resume_run
-        resume_run_id = wandb_cfg.resume_run_id
-
-        os_start_method = 'spawn' if os.name == 'nt' else 'fork'
-        run_datetime = datetime.now().isoformat().split('.')[0]
-        wandb.init(
-            project=wandb_cfg.project_name,
-            name=run_datetime,
-            config=config,
-            settings=wandb.Settings(start_method=os_start_method),
-            entity = entity_name,
-            resume="must" if resume_run else False,
-            id=resume_run_id)
-
-        if wandb_cfg.watch_model:
-            wandb.watch(
-                model,
-                criterion=loss_fn,
-                log="all", # default("gradients"), "parameters", "all"
-                log_freq=1,
-                log_graph=False)
+    wandb_logger.start_new_run(run_config=config)
+    wandb_logger.start_watcher(
+        model=model,
+        criterion=loss_fn,
+        log_freq=len(train_loader) // ACCUMULATION_STEPS)
 
     #===========CHECKPOINT===========
     checkpoint_cfg = config.checkpoint
@@ -166,12 +146,11 @@ def train_loop():
         val_loss = eval_fn(eval_loader, model, loss_fn)
 
         # ============WANDB==============
-        if wandb_cfg.enabled:
-            wandb.log({
-                'Params/Epoch': epoch,
-                'Train/Loss': train_loss,
-                'Validation/Loss': val_loss,
-            })
+        wandb_logger.log({
+            'Params/Epoch': epoch,
+            'Train/Loss': train_loss,
+            'Validation/Loss': val_loss,
+        })
 
         # ===========CHECKPOINT==========
         if checkpoint_cfg.save_checkpoint:
@@ -207,8 +186,7 @@ def train_loop():
                         print(f"Best model at epoch {best_model['epoch']} restored")
                     break
 
-    if wandb_cfg.enabled:
-        wandb.finish()
+    wandb_logger.stop_run()
 
 
 if __name__ == "__main__":
@@ -221,8 +199,8 @@ if __name__ == "__main__":
     dataset_cfg = config.dataset
     model_cfg = config.model
     hyperparams_cfg = config.hyperparameters.train
-    dataloader_cfg = config.dataloader.train
-    wandb_cfg = config.wandb
+
+    wandb_logger = WandBLogger(config.wandb)
 
     # ===========DATASET==============
     ANCHORS_DICT = get_anchors_dict(dataset_cfg.anchors_file)
