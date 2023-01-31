@@ -110,4 +110,4 @@ class YoloLoss(nn.Module):
                 self.yolo_loss_per_scale(predictions[size], target[size], anchors[size])
                 for size in scale_sizes
             ], dim=0)
-        return yolo_losses.mean()
+        return yolo_losses.mean(axis=0).sum()
