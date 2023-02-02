@@ -1,6 +1,7 @@
 import warnings
 from collections import OrderedDict
 from functools import partial
+from munch import Munch
 
 import torch
 import torchvision
@@ -13,13 +14,12 @@ logging.set_verbosity_error()
 
 
 class DocumentObjectDetector(torch.nn.Module):
-    def __init__(self):
+    def __init__(self, num_classes: int, config: Munch):
         super().__init__()
 
-        config = get_config()
-        self.num_classes: int = config.dataset.num_classes
-        self.fpn_channels: int = config.model.fpn_channels
-        self.backbone_name: str = config.model.backbone
+        self.num_classes: int = num_classes
+        self.fpn_channels: int = config.fpn_channels
+        self.backbone_name: str = config.backbone
 
         if self.backbone_name is None or self.backbone_name == "":
             warnings.warn("backbone_checkpoint is not set. Using default backbone (microsoft/dit-base).")
@@ -29,7 +29,7 @@ class DocumentObjectDetector(torch.nn.Module):
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             self.backbone = BeitModel.from_pretrained(self.backbone_name, add_pooling_layer=False)
-        self.backbone_forward = partial(self.backbone.forward, output_attentions=True, output_hidden_states=True, return_dict=True)
+        self.backbone_forward = partial(self.backbone.forward, output_hidden_states=True, return_dict=True)
         self.is_backbone_frozen: bool = False
 
         self.num_patches_per_side: int = self.backbone.config.image_size // self.backbone.config.patch_size

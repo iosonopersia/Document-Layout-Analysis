@@ -96,7 +96,7 @@ def train_loop():
     eval_loader = get_dataloader("val")
 
     # ===========MODEL===============
-    model = DocumentObjectDetector()
+    model = DocumentObjectDetector(NUM_CLASSES, model_cfg)
     model = model.to(DEVICE)
     loss_fn = YoloLoss()
 
@@ -177,6 +177,7 @@ if __name__ == "__main__":
     early_stopping = EarlyStopping(hyperparams_cfg.early_stopping, checkpoint_handler)
 
     # ===========DATASET==============
+    NUM_CLASSES = dataset_cfg.num_classes
     ANCHORS_DICT = get_anchors_dict(dataset_cfg.anchors_file)
     SCALED_ANCHORS = OrderedDict({
         size: torch.tensor(anchors, dtype=torch.float32, device='cpu') * size
