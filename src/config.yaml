@@ -18,35 +18,36 @@ dataset:
     apply_augmentations: False
 
 model:
-    fpn_channels: 768
+    fpn_channels: 256
     backbone: microsoft/dit-base
 
 hyperparameters:
-    train:
-        epochs: 1000
-        learning_rate: 1.0e-5
-        weight_decay: 0.01
-        momentum: 0.9
-        gradient_accumulation_steps: 32
-        finetuning:
-            frozen_epochs: 1
-            frozen_learning_rate: 4.0e-4
-        gradient_clip:
-            enabled: True
-            max_grad_norm: 1.0
-            grad_norm_type: 2 # Euclidean norm
-        scheduler:
-            enabled: False
-            scheduler_fn: ExponentialLR
-            gamma: 0.98
-        early_stopping:
-            enabled: False
-            patience: 3
-            restore_best: True
-    test:
-        confidence_threshold: 0.05
-        map_iou_threshold: 0.5
-        nms_iou_threshold: 0.45
+    epochs: 1000
+    learning_rate: 4.0e-5
+    weight_decay: 0.0
+    momentum: 0.9
+    gradient_accumulation_steps: 1 # 1 to disable
+    finetuning:
+        frozen_epochs: 1 # 0 to disable
+        frozen_learning_rate: 1.0e-5
+    gradient_clip:
+        enabled: True
+        max_grad_norm: 1.0
+        grad_norm_type: 2 # Euclidean norm
+    scheduler:
+        enabled: False
+        scheduler_fn: ExponentialLR
+        gamma: 0.99
+    early_stopping:
+        enabled: False
+        patience: 3
+        restore_best: True
+
+test:
+    checkpoint_path: checkpoints/model.pth
+    confidence_threshold: 0.25 # 0.05
+    nms_iou_threshold: 0.45
+    # map_iou_threshold: 0.5 # At the moment I compute mAP for all the IoU thresholds between 0.5 and 0.95
 
 dataloader:
     train:

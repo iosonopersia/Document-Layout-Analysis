@@ -169,9 +169,10 @@ if __name__ == "__main__":
     config = get_config()
     dataset_cfg = config.dataset
     model_cfg = config.model
-    hyperparams_cfg = config.hyperparameters.train
+    hyperparams_cfg = config.hyperparameters
     finetuning_cfg = hyperparams_cfg.finetuning
 
+    # ============TOOLS==============
     wandb_logger = WandBLogger(config.wandb)
     checkpoint_handler = CheckpointHandler(config.checkpoint)
     early_stopping = EarlyStopping(hyperparams_cfg.early_stopping, checkpoint_handler)
