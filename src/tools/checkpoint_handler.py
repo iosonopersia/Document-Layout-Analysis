@@ -52,3 +52,11 @@ class CheckpointHandler():
                 optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 
         return start_epoch
+
+    def load(self, model: Any) -> int:
+        if self.load_checkpoint:
+            print(f"CheckpointHandler: restoring checkpoint from {self.load_path}")
+            checkpoint = torch.load(self.load_path)
+            model.load_state_dict(checkpoint['model_state_dict'])
+        else:
+            raise ValueError("CheckpointHandler: Cannot load checkpoint if load_checkpoint is False")
