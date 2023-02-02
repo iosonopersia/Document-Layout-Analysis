@@ -180,7 +180,7 @@ if __name__ == "__main__":
     NUM_CLASSES = dataset_cfg.num_classes
     ANCHORS_DICT = get_anchors_dict(dataset_cfg.anchors_file)
     SCALED_ANCHORS = OrderedDict({
-        size: torch.tensor(anchors, dtype=torch.float32, device='cpu') * size
+        size: anchors * size
         for size, anchors in ANCHORS_DICT.items()
     })
 

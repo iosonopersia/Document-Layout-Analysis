@@ -1,6 +1,7 @@
 import csv
 import os
 
+import torch
 from munch import Munch
 
 config: Munch = None
@@ -33,10 +34,10 @@ def get_anchors_dict(filepath: str) -> dict[int, list[float]]:
     anchors = sorted(anchors, key=lambda x: x[0] * x[1]) # ascending order
 
     anchors_dict = {
-        56: anchors[0:3],
-        28: anchors[3:6],
-        14: anchors[6:9],
-        7: anchors[9:12]
+        56: torch.tensor(anchors[0:3], dtype=torch.float32),
+        28: torch.tensor(anchors[3:6], dtype=torch.float32),
+        14: torch.tensor(anchors[6:9], dtype=torch.float32),
+        7: torch.tensor(anchors[9:12], dtype=torch.float32)
     }
 
     return anchors_dict
