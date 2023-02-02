@@ -2,11 +2,15 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 
-from yolo_utils import intersection_over_union
+from metrics.iou import intersection_over_union
+
 
 OBJ = list(range(0, 1))
 BBOX = list(range(1, 5))
 CLS = list(range(5, 16))
+
+BBOX_POS = list(range(1, 3))
+BBOX_SIZE = list(range(3, 5))
 
 
 class YoloLossPerScale(nn.Module):
@@ -16,7 +20,7 @@ class YoloLossPerScale(nn.Module):
         self.bce = nn.BCEWithLogitsLoss()
         self.sigmoid = nn.Sigmoid()
 
-    def forward(self, predictions: Tensor, target: Tensor, anchor_sizes: Tensor) -> Tensor:
+    def forward(self, predictions: Tensor, target: Tensor, anchors: Tensor) -> Tensor:
         """
         Compute the YOLOv3 loss for a single scale
 
@@ -46,23 +50,26 @@ class YoloLossPerScale(nn.Module):
 
         no_object_loss = self.bce(predicted_no_objectness, torch.zeros_like(predicted_no_objectness))
 
+        # Check if there are any objects in the target
+        NUM_OBJ = obj_mask.sum()
+        if NUM_OBJ == 0:
+            return torch.tensor([0.0, 0.0, no_object_loss, 0.0], dtype=torch.float32)
+
         # ==================== #
         #          IoU         #
         # ==================== #
-        obj_tensor_indices = torch.argwhere(obj_mask) # (num_objects, 4)
-        obj_anchors_indices = obj_tensor_indices[:, 1] # (num_objects) anchor index for each object
-        obj_anchors = anchor_sizes[obj_anchors_indices] # (num_objects, 2) anchor size for each object (width, height)
-        obj_grid_indices = obj_tensor_indices[:, [3, 2]] # (num_objects, 2) grid cell index for each object (j, i), meaning (x, y)
+        # Predicted box coordinates
+        predicted_boxes = torch.cat([
+            self.sigmoid(predictions[..., BBOX_POS].detach().clone()),
+            torch.exp(predictions[..., BBOX_SIZE].detach().clone()) * anchors.reshape(1, 3, 1, 1, 2)
+        ], dim=-1)
+        predicted_boxes = torch.masked_select(predicted_boxes, obj_mask).reshape(-1, 4)
 
-        predicted_boxes = torch.masked_select(predictions[..., BBOX], obj_mask).reshape(-1, 4)
+        # Target box coordinates
         target_boxes = torch.masked_select(target[..., BBOX], obj_mask).reshape(-1, 4)
-        predicted_boxes[:, [0, 1]] = self.sigmoid(predicted_boxes[:, [0, 1]]) # (Δx, Δy)
 
-        iou_predicted_boxes = predicted_boxes.detach().clone()
-        iou_predicted_boxes[:, [0, 1]] = obj_grid_indices + iou_predicted_boxes[:, [0, 1]] # (x, y)
-        iou_predicted_boxes[:, [2, 3]] = obj_anchors * torch.exp(iou_predicted_boxes[:, [2, 3]]) # (width, height)
+        ious = intersection_over_union(predicted_boxes, target_boxes)
 
-        ious = intersection_over_union(iou_predicted_boxes, target_boxes, box_format='midpoint')
 
         # ==================== #
         #      OBJECT LOSS     #
@@ -74,8 +81,12 @@ class YoloLossPerScale(nn.Module):
         # ==================== #
         #       BOX LOSS       #
         # ==================== #
-        target_boxes[:, [0, 1]] = target_boxes[:, [0, 1]] - obj_grid_indices # (Δx, Δy)
-        target_boxes[:, [2, 3]] = torch.log(1e-6 + target_boxes[:, [2, 3]] / obj_anchors) # width, height adjustments
+        predicted_boxes = torch.masked_select(predictions[..., BBOX], obj_mask).reshape(-1, 4)
+        predicted_boxes[:, [0, 1]] = self.sigmoid(predicted_boxes[:, [0, 1]])
+
+        target_boxes = target[..., BBOX].clone()
+        target_boxes[..., [2, 3]] = torch.log(1e-16 + target_boxes[..., [2, 3]] / anchors.reshape(1, 3, 1, 1, 2))
+        target_boxes = torch.masked_select(target_boxes, obj_mask).reshape(-1, 4)
 
         box_loss = self.mse(predicted_boxes, target_boxes)
 

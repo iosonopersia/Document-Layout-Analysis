@@ -149,7 +149,8 @@ class COCODataset(Dataset):
             x, y, width, height = bbox.x_center, bbox.y_center, bbox.w, bbox.h # Normalized to [0, 1]
 
             for S in self.S:
-                i, j = int(S * y), int(S * x) # Indices of the cell in which the center of the GT-bbox falls
+                j, i = int(S * x), int(S * y) # Indices of the cell in which the center of the GT-bbox falls
+                dx, dy = (S * x) - j, (S * y) - i # Offsets of the center of the GT-bbox from the top-left corner of the cell
 
                 anchors = self.anchor_shapes[S] # Anchors for this scale
 
@@ -166,7 +167,7 @@ class COCODataset(Dataset):
                         if not is_anchor_assigned:
                             target_tensor = torch.zeros((5+self.C), dtype=torch.float32)
                             target_tensor[0] = 1 # Objectness score
-                            target_tensor[1:5] = S * torch.tensor([x, y, width, height], dtype=torch.float32) # Bbox coords
+                            target_tensor[1:5] = torch.tensor([dx, dy, S*width, S*height], dtype=torch.float32) # Bbox coords
                             target_tensor[5+class_label-1] = 1 # Class label (subtract 1 to make class labels start from 0)
 
                             targets[S][anchor_idx, i, j, :] = target_tensor
@@ -177,10 +178,10 @@ class COCODataset(Dataset):
                                 targets[S][anchor_idx, i, j, [0]] = -1
 
         # Extract features
-        image = self.feature_extractor(image, return_tensors='pt').pixel_values
+        image = self.feature_extractor(image, return_tensors='pt').pixel_values # (1, C, H, W)
         image = image.squeeze(dim=0) # (C, H, W)
 
-        return {'image': image, 'target': targets}
+        return {'image_id': image_id, 'image': image, 'target': targets}
 
     def _shape_similarity(self, w1: float, h1: float, w2: float, h2: float) -> float:
         intersection = min(w1, w2) * min(h1, h2)
