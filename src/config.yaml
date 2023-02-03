@@ -23,14 +23,17 @@ model:
     backbone: microsoft/dit-base
 
 hyperparameters:
-    epochs: 1000
-    learning_rate: 4.0e-5
-    weight_decay: 0.0
+    optimizer: AdamW # AdamW, SGD
+    epochs: 100
+    learning_rate: 4.0e-4
+    weight_decay: 0.05
     momentum: 0.9
     gradient_accumulation_steps: 1 # 1 to disable
-    finetuning:
-        frozen_epochs: 1 # 0 to disable
-        frozen_learning_rate: 1.0e-5
+    frozen_backbone:
+        epochs: 1 # 0 to disable
+        learning_rate: 1.0e-3
+        weight_decay: 0.01
+        momentum: 0.9
     gradient_clip:
         enabled: True
         max_grad_norm: 1.0
@@ -40,7 +43,7 @@ hyperparameters:
         scheduler_fn: ExponentialLR
         gamma: 0.99
     early_stopping:
-        enabled: False
+        enabled: True
         patience: 3
         restore_best: True
 

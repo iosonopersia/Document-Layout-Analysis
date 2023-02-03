@@ -102,20 +102,36 @@ def train_loop():
 
     # ===========OPTIMIZER===========
     model.freeze_backbone() # marks backbone parameters as not trainable
-    frozen_optimizer = optim.SGD(
-        params=filter(lambda p: p.requires_grad, model.parameters()),
-        lr=FROZEN_LR,
-        momentum=MOMENTUM,
-        weight_decay=WD,
-        nesterov=True)
+    if OPTIMIZER == "AdamW":
+        frozen_optimizer = optim.AdamW(
+            params=model.parameters(),
+            lr=FROZEN_LR,
+            weight_decay=FROZEN_WD)
+    elif OPTIMIZER == "SGD":
+        frozen_optimizer = optim.SGD(
+            params=model.parameters(),
+            lr=FROZEN_LR,
+            momentum=FROZEN_MOMENTUM,
+            weight_decay=FROZEN_WD,
+            nesterov=True)
+    else:
+        raise ValueError(f"Optimizer {OPTIMIZER} not supported")
 
     model.unfreeze_backbone() # marks all parameters as trainable
-    optimizer = optim.SGD(
-        params=model.parameters(),
-        lr=LR,
-        momentum=MOMENTUM,
-        weight_decay=WD,
-        nesterov=True)
+    if OPTIMIZER == "AdamW":
+        optimizer = optim.AdamW(
+            params=model.parameters(),
+            lr=LR,
+            weight_decay=WD)
+    elif OPTIMIZER == "SGD":
+        optimizer = optim.SGD(
+            params=model.parameters(),
+            lr=LR,
+            momentum=MOMENTUM,
+            weight_decay=WD,
+            nesterov=True)
+    else:
+        raise ValueError(f"Optimizer {OPTIMIZER} not supported")
 
     #============WANDB===============
     wandb_logger.start_new_run(run_config=config)
@@ -170,7 +186,7 @@ if __name__ == "__main__":
     dataset_cfg = config.dataset
     model_cfg = config.model
     hyperparams_cfg = config.hyperparameters
-    finetuning_cfg = hyperparams_cfg.finetuning
+    frozen_backbone_cfg = hyperparams_cfg.frozen_backbone
 
     # ============TOOLS==============
     wandb_logger = WandBLogger(config.wandb)
@@ -186,13 +202,17 @@ if __name__ == "__main__":
     })
 
     # ========HYPERPARAMETERS========
-    FROZEN_EPOCHS = finetuning_cfg.frozen_epochs
-    FROZEN_LR = finetuning_cfg.frozen_learning_rate
+    OPTIMIZER = hyperparams_cfg.optimizer
+    ACCUMULATION_STEPS = hyperparams_cfg.gradient_accumulation_steps
 
+    FROZEN_EPOCHS = frozen_backbone_cfg.epochs
+    FROZEN_LR = frozen_backbone_cfg.learning_rate
+    FROZEN_WD = frozen_backbone_cfg.weight_decay
+    FROZEN_MOMENTUM = frozen_backbone_cfg.momentum
+
+    EPOCHS = hyperparams_cfg.epochs + FROZEN_EPOCHS
     LR = hyperparams_cfg.learning_rate
     WD = hyperparams_cfg.weight_decay
     MOMENTUM = hyperparams_cfg.momentum
-    EPOCHS = hyperparams_cfg.epochs
-    ACCUMULATION_STEPS = hyperparams_cfg.gradient_accumulation_steps
 
     train_loop()
