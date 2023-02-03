@@ -76,24 +76,6 @@ class COCOBoundingBox:
     def to_xyxy(self) -> list[float]:
         return [self.x1, self.y1, self.x2, self.y2]
 
-    def iou(self, other: "COCOBoundingBox") -> float:
-        x1 = max(self.x1, other.x1)
-        y1 = max(self.y1, other.y1)
-        x2 = min(self.x2, other.x2)
-        y2 = min(self.y2, other.y2)
-
-        if x2 <= x1 or y2 <= y1:
-            return 0.0
-
-        intersection = (x2 - x1) * (y2 - y1)
-        union = self.area + other.area - intersection
-        return intersection / union
-
-    def shape_similarity(self, other: "COCOBoundingBox") -> float:
-        intersection = min(self.w, other.w) * min(self.h, other.h)
-        union = self.area + other.area - intersection
-        return intersection / union
-
 
 @dataclass(frozen=True)
 class COCOAnnotation:
