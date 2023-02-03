@@ -135,10 +135,11 @@ def train_loop():
 
     #============WANDB===============
     wandb_logger.start_new_run(run_config=config)
+    num_steps_per_epoch = len(train_loader) // ACCUMULATION_STEPS
     wandb_logger.start_watcher(
         model=model,
         criterion=loss_fn,
-        log_freq=len(train_loader) // ACCUMULATION_STEPS)
+        log_freq=num_steps_per_epoch // 10) # log 10 times per epoch
 
     #===========CHECKPOINT===========
     start_epoch = checkpoint_handler.restore(model, optimizer)
