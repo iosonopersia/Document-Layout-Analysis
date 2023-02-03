@@ -12,6 +12,7 @@ dataset:
     val_labels_file: E:/DocLayNet_core/COCO/val.json
     test_labels_file: E:/DocLayNet_core/COCO/test.json
     anchors_file: data/anchors.csv
+    mean_std_file: data/mean_std.json
     num_classes: 11
     image_size: 1025
     doc_categories: ['scientific_articles']

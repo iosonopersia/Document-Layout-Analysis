@@ -14,7 +14,7 @@ def test_metrics():
     # ===========MODEL===============
     model = DocumentObjectDetector(NUM_CLASSES, model_cfg)
     model = model.to(DEVICE)
-    checkpoint_handler.load(model)
+    checkpoint_handler.load(test_cfg.checkpoint_path, model)
 
     # ============TEST===============
     print("Extracting bboxes from model predictions on the test set...")
