@@ -10,7 +10,7 @@ from transformers import BeitFeatureExtractor, logging
 
 from augmentation import test_transforms, train_transforms
 from coco import COCOAnnotation, COCOBoundingBox
-from utils import get_anchors_dict, get_config
+from utils import get_anchors_dict, get_config, get_mean_std
 
 logging.set_verbosity_error()
 
@@ -203,6 +203,13 @@ def get_dataloader(split: str = "train") -> tuple[COCODataset, torch.utils.data.
             warnings.simplefilter("ignore")
             model_cfg = config.model
             feature_extractor = BeitFeatureExtractor.from_pretrained(model_cfg.backbone)
+
+        # Override default mean and std values with those that are suitable for the dataset
+        mean_std_path = os.path.abspath(config.dataset.mean_std_file)
+        mean, std = get_mean_std(mean_std_path)
+        feature_extractor.do_normalize = True
+        feature_extractor.image_mean = mean
+        feature_extractor.image_std = std
 
     # Select config for the required split
     if split in ["train", "val", "test"]:
