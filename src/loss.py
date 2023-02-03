@@ -39,14 +39,20 @@ class YoloLossPerScale(nn.Module):
         C = predictions.shape[-1] - 5
 
         # Get the obj and noobj masks
-        obj_mask = target[..., OBJ] == 1
-        noobj_mask = target[..., OBJ] == 0
-        # ignored_mask = target[..., OBJ] == -1
+        obj_mask = (target[..., OBJ] == 1).repeat(1, 1, 1, 1, 5 + C)
+        noobj_mask = (target[..., OBJ] == 0).repeat(1, 1, 1, 1, 5 + C)
+        # ignored_mask = (target[..., OBJ] == -1).repeat(1, 1, 1, 1, 5 + C)
+
+        noobj_predictions = predictions[noobj_mask].reshape(-1, 5+ C)
+        obj_predictions = predictions[obj_mask].reshape(-1, 5 + C)
+
+        # noobj_target = target[noobj_mask].reshape(-1, 5 + C)
+        obj_target = target[obj_mask].reshape(-1, 5 + C)
 
         # ==================== #
         #    NO_OBJECT LOSS    #
         # ==================== #
-        predicted_no_objectness = torch.masked_select(predictions[..., OBJ], noobj_mask)
+        predicted_no_objectness = noobj_predictions[:, OBJ]
 
         no_object_loss = self.bce(predicted_no_objectness, torch.zeros_like(predicted_no_objectness))
 
@@ -59,14 +65,16 @@ class YoloLossPerScale(nn.Module):
         #          IoU         #
         # ==================== #
         # Predicted box coordinates
-        predicted_boxes = torch.cat([
-            self.sigmoid(predictions[..., BBOX_POS].detach().clone()),
-            torch.exp(predictions[..., BBOX_SIZE].detach().clone()) * anchors.reshape(1, 3, 1, 1, 2)
+        all_box_predictions = torch.cat([
+            self.sigmoid(predictions[..., BBOX_POS].detach()),
+            torch.exp(predictions[..., BBOX_SIZE].detach()) * anchors.reshape(1, 3, 1, 1, 2)
         ], dim=-1)
-        predicted_boxes = torch.masked_select(predicted_boxes, obj_mask).reshape(-1, 4)
+
+        obj_mask_box = obj_mask[..., BBOX]
+        predicted_boxes = all_box_predictions[obj_mask_box].reshape(-1, 4)
 
         # Target box coordinates
-        target_boxes = torch.masked_select(target[..., BBOX], obj_mask).reshape(-1, 4)
+        target_boxes = obj_target[:, BBOX]
 
         ious = intersection_over_union(predicted_boxes, target_boxes)
 
@@ -74,27 +82,30 @@ class YoloLossPerScale(nn.Module):
         # ==================== #
         #      OBJECT LOSS     #
         # ==================== #
-        predicted_objectness = torch.masked_select(predictions[..., OBJ], obj_mask)
+        predicted_objectness = obj_predictions[:, OBJ]
 
         object_loss = self.bce(predicted_objectness, ious)
 
         # ==================== #
         #       BOX LOSS       #
         # ==================== #
-        predicted_boxes = torch.masked_select(predictions[..., BBOX], obj_mask).reshape(-1, 4)
+        predicted_boxes = obj_predictions[:, BBOX]
         predicted_boxes[:, [0, 1]] = self.sigmoid(predicted_boxes[:, [0, 1]])
 
-        target_boxes = target[..., BBOX].clone()
-        target_boxes[..., [2, 3]] = torch.log(1e-16 + target_boxes[..., [2, 3]] / anchors.reshape(1, 3, 1, 1, 2))
-        target_boxes = torch.masked_select(target_boxes, obj_mask).reshape(-1, 4)
+        target_boxes = torch.cat([
+            target[..., BBOX_POS],
+            target[..., BBOX_SIZE] / anchors.reshape(1, 3, 1, 1, 2)
+        ], dim=-1)
+        target_boxes[..., [2, 3]] = torch.log(1e-16 + target_boxes[..., [2, 3]])
+        target_boxes = target_boxes[obj_mask_box].reshape(-1, 4)
 
         box_loss = self.mse(predicted_boxes, target_boxes)
 
         # ==================== #
         #      CLASS LOSS      #
         # ==================== #
-        predicted_classes = torch.masked_select(predictions[..., CLS], obj_mask).reshape(-1, C)
-        target_classes = torch.masked_select(target[..., CLS], obj_mask).reshape(-1, C)
+        predicted_classes = obj_predictions[:, CLS]
+        target_classes = obj_target[:, CLS]
 
         class_loss = self.bce(predicted_classes, target_classes)
 
