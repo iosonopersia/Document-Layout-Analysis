@@ -53,10 +53,11 @@ class CheckpointHandler():
 
         return start_epoch
 
-    def load(self, model: Any) -> int:
-        if self.load_checkpoint:
-            print(f"CheckpointHandler: restoring checkpoint from {self.load_path}")
-            checkpoint = torch.load(self.load_path)
+    def load(self, checkpoint_path: str, model: Any) -> int:
+        checkpoint_path = os.path.abspath(checkpoint_path)
+        if os.path.exists(checkpoint_path):
+            print(f"CheckpointHandler: loading checkpoint from {checkpoint_path}")
+            checkpoint = torch.load(checkpoint_path)
             model.load_state_dict(checkpoint['model_state_dict'])
         else:
-            raise ValueError("CheckpointHandler: Cannot load checkpoint if load_checkpoint is False")
+            raise FileNotFoundError(f"CheckpointHandler: Checkpoint file {checkpoint_path} does not exist")
