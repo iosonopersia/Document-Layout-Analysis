@@ -5,28 +5,26 @@ from metrics.iou import intersection_over_union
 
 def mean_average_precision(pred_boxes: torch.Tensor, true_boxes: torch.Tensor, num_classes: int=11):
     iou_thresholds = torch.arange(0.5, 1.0, 0.05, dtype=torch.float32)
-    mAP_per_iou = torch.zeros_like(iou_thresholds)
 
+    mAP_per_iou_per_class = torch.zeros((iou_thresholds.numel(), num_classes), dtype=torch.float32)
     for i in tqdm(range(iou_thresholds.numel())):
         iou_threshold = iou_thresholds[i].item()
-
-        AP_per_class = torch.zeros(num_classes, dtype=torch.float32)
         for c in range(num_classes):
-            AP_per_class[c] = average_precision_per_class(pred_boxes, true_boxes, iou_threshold, c)
+            mAP_per_iou_per_class[i, c] = average_precision_per_class(pred_boxes, true_boxes, iou_threshold, c)
 
-        mAP_per_iou[i] = AP_per_class.mean()
-
-    return mAP_per_iou.mean()
+    return mAP_per_iou_per_class
 
 
 def average_precision_per_class(pred_boxes: torch.Tensor, true_boxes: torch.Tensor, iou_threshold: float, class_id: int) -> float:
-    SAMPLE_ID = 0
-    CLASS_ID = 1
-    OBJ_SCORE = 2
-    BBOX = list(range(3, 7))
+    SAMPLE_ID = [0]
+    CLASS_ID = [1]
+    OBJ_SCORE = [2]
+    BBOX = [3, 4, 5, 6]
 
-    detections = torch.masked_select(pred_boxes, pred_boxes[:, [CLASS_ID]] == class_id).reshape(-1, 7)
-    ground_truths = torch.masked_select(true_boxes, true_boxes[:, [CLASS_ID]] == class_id).reshape(-1, 7)
+    detections_mask = (pred_boxes[:, CLASS_ID] == class_id).repeat(1, 7)
+    detections = pred_boxes[detections_mask].reshape(-1, 7)
+    ground_truths_mask = (true_boxes[:, CLASS_ID] == class_id).repeat(1, 7)
+    ground_truths = true_boxes[ground_truths_mask].reshape(-1, 7)
 
     num_detections: int = detections.shape[0]
     num_ground_truths: int = ground_truths.shape[0]
@@ -38,8 +36,8 @@ def average_precision_per_class(pred_boxes: torch.Tensor, true_boxes: torch.Tens
     img_ids, num_bboxes_per_img = ground_truths[:, SAMPLE_ID].int().unique(sorted=False, return_counts=True, dim=None)
     is_matched_bbox = {img_ids[i].item(): torch.zeros(num_bboxes_per_img[i], dtype=torch.bool) for i in range(img_ids.shape[0])}
 
-    sorted_indices = detections[:, OBJ_SCORE].argsort(stable=False, dim=0, descending=True)
-    detections = detections[sorted_indices]
+    sorted_indices = detections[:, OBJ_SCORE].flatten().argsort(stable=False, descending=True, dim=0)
+    detections = detections[sorted_indices, :]
     is_TP = torch.zeros(num_detections, dtype=torch.bool)
 
     for i in range(num_detections):
@@ -54,10 +52,11 @@ def average_precision_per_class(pred_boxes: torch.Tensor, true_boxes: torch.Tens
             continue
 
         # IoUs must be calculated for each ground truth bbox from the same image
-        ground_truth_img = torch.masked_select(ground_truths, ground_truths[:, [SAMPLE_ID]] == detection_img_id).reshape(-1, 7)
+        sample_id_mask = (ground_truths[:, SAMPLE_ID] == detection_img_id).repeat(1, 7)
+        ground_truth_img = ground_truths[sample_id_mask].reshape(-1, 7)
 
-        ious = intersection_over_union(detection[BBOX], ground_truth_img[:, BBOX])
-        best_gt_idx = torch.argmax(ious)
+        ious = intersection_over_union(detection[BBOX], ground_truth_img[:, BBOX]) # (num_ground_truths, 1)
+        best_gt_idx = torch.argmax(ious, dim=0)
         best_iou = ious[best_gt_idx]
 
         if best_iou > iou_threshold and not is_matched_bbox[detection_img_id][best_gt_idx]:

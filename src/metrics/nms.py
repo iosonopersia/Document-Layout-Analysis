@@ -20,19 +20,20 @@ def non_max_suppression(bboxes: torch.Tensor, iou_threshold: float, confidence_t
 
 
 def nms_per_class(bboxes: torch.Tensor, iou_threshold: float, threshold: float, class_id: int) -> torch.Tensor:
-    CLASS_ID = 1
-    OBJ_SCORE = 2
+    CLASS_ID = [1]
+    OBJ_SCORE = [2]
 
     # Bounding boxes are filtered by class and (minimum) objectness score
-    class_mask = bboxes[:, [CLASS_ID]] == class_id
-    objectness_mask = bboxes[:, [OBJ_SCORE]] > threshold
+    class_mask = bboxes[:, CLASS_ID] == class_id
+    objectness_mask = bboxes[:, OBJ_SCORE] > threshold
     selection_mask = torch.logical_and(class_mask, objectness_mask)
+    selection_mask = selection_mask.repeat(1, 7)
 
-    bboxes = torch.masked_select(bboxes, selection_mask).reshape(-1, 7)
+    bboxes = bboxes[selection_mask].reshape(-1, 7)
 
     # Bounding boxes are sorted by objectness score
-    sorted_indices = bboxes[:, OBJ_SCORE].argsort(stable=False, dim=0, descending=True)
-    bboxes = bboxes[sorted_indices]
+    sorted_indices = bboxes[:, OBJ_SCORE].flatten().argsort(stable=False, dim=0, descending=True)
+    bboxes = bboxes[sorted_indices, :]
 
     bbox_ids: list[int] = list(range(bboxes.shape[0]))
     bbox_ids_after_nms: list[int] = []

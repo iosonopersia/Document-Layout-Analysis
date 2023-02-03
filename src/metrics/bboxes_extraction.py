@@ -99,23 +99,24 @@ def predictions_to_bboxes(predictions: dict[int, torch.Tensor], image_ids: torch
 
 
 def targets_to_bboxes(targets: dict[int, torch.Tensor], image_ids: torch.Tensor) -> torch.Tensor:
-    OBJ_SCORE = 0
+    OBJ_SCORE = [0]
     # We can consider just one scale, since bboxes are the same across all scales
     # We choose the last scale, which is the smallest one, to speed up the process
     S = list(targets.keys())[-1]
     B = targets[S].shape[0]
+    C = targets[S].shape[-1] - 5
 
     true_boxes_per_image = []
     for i in range(B):
-        tgt_per_image = targets[S][[i], ...]
+        tgt_per_image = targets[S][[i], ...] # (1, 3, S, S, 16)
 
         # ================================================
         # Filter out non-object bounding boxes from target
         # ================================================
-        obj_mask = tgt_per_image[..., [OBJ_SCORE]] == 1
-        tgt = torch.masked_select(tgt_per_image, obj_mask).reshape(-1, 5+11) # (N, 5+11)
+        obj_mask = tgt_per_image[..., OBJ_SCORE] == 1
+        tgt = tgt_per_image[obj_mask.repeat(1, 1, 1, 1, 5 + C)].reshape(-1, 5 + C) # (N, 5+C)
         N = tgt.shape[0]
-        tgt_class = torch.argmax(tgt[..., 5:16], dim=-1, keepdim=True) # (N, 1)
+        tgt_class = torch.argmax(tgt[:, 5:16], dim=-1, keepdim=True) # (N, 1)
         tgt_image_id = image_ids[[i]].repeat(N, 1) # (N, 1)
 
         # =============================================
@@ -129,7 +130,7 @@ def targets_to_bboxes(targets: dict[int, torch.Tensor], image_ids: torch.Tensor)
         # ================================================
         tgt[:, 1:5] *= (1025 / S)
 
-        tgt = torch.cat([tgt_image_id, tgt_class, tgt[..., 0:5]], dim=-1) # (N, 1) + (N, 1) + (N, 5) -> (N, 7)
+        tgt = torch.cat([tgt_image_id, tgt_class, tgt[:, 0:5]], dim=-1) # (N, 1) + (N, 1) + (N, 5) -> (N, 7)
         true_boxes_per_image.append(tgt)
 
     true_boxes = torch.cat(true_boxes_per_image, dim=0) # (#GT_BOXES, 7)
