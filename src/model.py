@@ -8,8 +8,6 @@ import torchvision
 from torch import Tensor
 from transformers import BeitModel, logging
 
-from utils import get_config
-
 logging.set_verbosity_error()
 
 
@@ -89,7 +87,7 @@ class DocumentObjectDetector(torch.nn.Module):
         self.FEAT_MAPS_SHAPE: tuple[int] = (
             -1, # batch size
             len(self.fpn_layers), # number of feature maps
-            self.backbone.config.hidden_size, # patch embedding size
+            self.hidden_size, # patch embedding size
             self.num_patches_per_side, # number of patches along the vertical axis
             self.num_patches_per_side # number of patches along the horizontal axis
         )
@@ -108,17 +106,17 @@ class DocumentObjectDetector(torch.nn.Module):
         hidden_states: tuple[Tensor] = backbone_outputs.hidden_states[1:]
 
         # Extract feature maps from hidden states
-        feature_maps: Tensor = torch.stack([hidden_states[i] for i in self.fpn_layers], dim=1) # (B, 4, 197, 1024)
-        feature_maps = feature_maps[:, :, 1:, :] # remove cls token (B, 4, 196, 1024)
-        feature_maps = feature_maps.transpose(2, 3) # (B, 4, 1024, 196)
-        feature_maps = feature_maps.reshape(self.FEAT_MAPS_SHAPE) # (B, 4, 1024, 14, 14)
+        feature_maps: Tensor = torch.stack([hidden_states[i] for i in self.fpn_layers], dim=1) # (B, 4, 197, 768)
+        feature_maps = feature_maps[:, :, 1:, :] # remove cls token (B, 4, 196, 768)
+        feature_maps = feature_maps.transpose(2, 3) # (B, 4, 768, 196)
+        feature_maps = feature_maps.reshape(self.FEAT_MAPS_SHAPE) # (B, 4, 768, 14, 14)
 
         # Apply non-linear activation
         feature_maps = self.feature_maps_activation(feature_maps)
 
         fpn_input: dict[str, Tensor] = OrderedDict()
         for i in range(len(self.fpn_layers)):
-            feat_map = feature_maps[:, i, ...] # (B, 1024, 14, 14)
+            feat_map = feature_maps[:, i, ...] # (B, 768, 14, 14)
             layer_name: str = self.fpn_layer_names[i]
 
             feat_map = self.rescalers[i](feat_map) # apply rescaling
@@ -158,7 +156,7 @@ def test_model():
 
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
-    model = DocumentObjectDetector()
+    model = DocumentObjectDetector(C, Munch(fpn_channels=256, backbone='microsoft/dit-base'))
     model.to(device)
     model.eval()
 
