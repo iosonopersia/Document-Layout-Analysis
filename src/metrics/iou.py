@@ -12,18 +12,19 @@ def intersection_over_union(boxes_preds: torch.Tensor, boxes_labels: torch.Tenso
     Returns:
         tensor: Intersection over union for all examples
     """
+    X, Y, W, H = [0], [1], [2], [3]
 
     # Predicted bounding boxes coordinates
-    box1_x1 = boxes_preds[..., 0] - boxes_preds[..., 2] / 2
-    box1_y1 = boxes_preds[..., 1] - boxes_preds[..., 3] / 2
-    box1_x2 = boxes_preds[..., 0] + boxes_preds[..., 2] / 2
-    box1_y2 = boxes_preds[..., 1] + boxes_preds[..., 3] / 2
+    box1_x1 = boxes_preds[..., X] - boxes_preds[..., W] / 2
+    box1_y1 = boxes_preds[..., Y] - boxes_preds[..., H] / 2
+    box1_x2 = boxes_preds[..., X] + boxes_preds[..., W] / 2
+    box1_y2 = boxes_preds[..., Y] + boxes_preds[..., H] / 2
 
     # True bounding boxes coordinates
-    box2_x1 = boxes_labels[..., 0] - boxes_labels[..., 2] / 2
-    box2_y1 = boxes_labels[..., 1] - boxes_labels[..., 3] / 2
-    box2_x2 = boxes_labels[..., 0] + boxes_labels[..., 2] / 2
-    box2_y2 = boxes_labels[..., 1] + boxes_labels[..., 3] / 2
+    box2_x1 = boxes_labels[..., X] - boxes_labels[..., W] / 2
+    box2_y1 = boxes_labels[..., Y] - boxes_labels[..., H] / 2
+    box2_x2 = boxes_labels[..., X] + boxes_labels[..., W] / 2
+    box2_y2 = boxes_labels[..., Y] + boxes_labels[..., H] / 2
 
     # Intersection coordinates
     x1 = torch.max(box1_x1, box2_x1)
