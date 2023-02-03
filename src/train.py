@@ -98,7 +98,7 @@ def train_loop():
     # ===========MODEL===============
     model = DocumentObjectDetector(NUM_CLASSES, model_cfg)
     model = model.to(DEVICE)
-    loss_fn = YoloLoss()
+    loss_fn = YoloLoss(wandb_logger)
 
     # ===========OPTIMIZER===========
     model.freeze_backbone() # marks backbone parameters as not trainable

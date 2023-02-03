@@ -14,11 +14,12 @@ BBOX_SIZE = list(range(3, 5))
 
 
 class YoloLossPerScale(nn.Module):
-    def __init__(self):
+    def __init__(self, wandb_logger):
         super().__init__()
         self.mse = nn.MSELoss()
         self.bce = nn.BCEWithLogitsLoss()
         self.sigmoid = nn.Sigmoid()
+        self.wandb_logger = wandb_logger
 
     def forward(self, predictions: Tensor, target: Tensor, anchors: Tensor) -> Tensor:
         """
@@ -59,6 +60,12 @@ class YoloLossPerScale(nn.Module):
         # Check if there are any objects in the target
         NUM_OBJ = obj_mask.sum()
         if NUM_OBJ == 0:
+            self.wandb_logger.log({
+                f'size_{S}/box_loss': 0.0,
+                f'size_{S}/object_loss': 0.0,
+                f'size_{S}/no_object_loss': no_object_loss,
+                f'size_{S}/class_loss': 0.0,
+            })
             return torch.tensor([0.0, 0.0, no_object_loss, 0.0], dtype=torch.float32)
 
         # ==================== #
@@ -78,6 +85,9 @@ class YoloLossPerScale(nn.Module):
 
         ious = intersection_over_union(predicted_boxes, target_boxes)
 
+        self.wandb_logger.log({
+            f'size_{S}/mean_iou': ious.mean(),
+        })
 
         # ==================== #
         #      OBJECT LOSS     #
@@ -115,15 +125,21 @@ class YoloLossPerScale(nn.Module):
         no_object_loss *= 0.5 # λnoobj
         box_loss *= 5.0 # λcoord
 
+        self.wandb_logger.log({
+            f'size_{S}/box_loss': box_loss,
+            f'size_{S}/object_loss': object_loss,
+            f'size_{S}/no_object_loss': no_object_loss,
+            f'size_{S}/class_loss': class_loss,
+        })
 
         yolo_loss = torch.stack([box_loss, object_loss, no_object_loss, class_loss], dim=0)
         return yolo_loss
 
 
 class YoloLoss(nn.Module):
-    def __init__(self) -> None:
+    def __init__(self, wandb_logger) -> None:
         super().__init__()
-        self.yolo_loss_per_scale = YoloLossPerScale()
+        self.yolo_loss_per_scale = YoloLossPerScale(wandb_logger)
 
     def forward(self, predictions: dict[int, Tensor], target: dict[int, Tensor], anchors: dict[int, Tensor]) -> Tensor:
         scale_sizes: tuple[int] = tuple(predictions.keys())
