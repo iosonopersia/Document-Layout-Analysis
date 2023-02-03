@@ -1,4 +1,5 @@
 import csv
+import json
 import os
 import random
 
@@ -43,6 +44,23 @@ def get_anchors_dict(filepath: str) -> dict[int, list[float]]:
     }
 
     return anchors_dict
+
+def get_mean_std(filepath: str) -> tuple[tuple[float], tuple[float]]:
+    filepath = os.path.abspath(filepath)
+    if not os.path.exists(filepath):
+        raise FileNotFoundError("mean_std.json file not found")
+
+    with open(filepath, "rt") as f:
+        json_data = json.load(f)
+
+    assert 'mean' in json_data and 'std' in json_data
+
+    mean = tuple(json_data['mean'])
+    std = tuple(json_data['std'])
+
+    assert len(mean) == 3 and len(std) == 3
+
+    return mean, std
 
 
 def seed_everything(seed: int=42) -> None:
