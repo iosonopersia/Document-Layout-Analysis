@@ -57,3 +57,11 @@ if __name__ == '__main__':
     print(f'Mean: R={mean_per_channel[0]} G={mean_per_channel[1]} B={mean_per_channel[2]}')
     print(f'Std: R={std_per_channel[0]} G={std_per_channel[1]} B={std_per_channel[2]}')
 
+    mean_std_filepath = os.path.abspath(config.dataset.mean_std_file)
+    print(f'Saving mean and std to {mean_std_filepath}')
+    with open(config.dataset.mean_std_file, 'wt', encoding='utf-8') as f:
+        json.dump({
+            'mean': mean_per_channel.tolist(),
+            'std': std_per_channel.tolist(),
+        }, f)
+
