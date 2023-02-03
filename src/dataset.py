@@ -51,7 +51,9 @@ class COCODataset(Dataset):
         self.id_to_image_filename: dict[int, str] = {
             image['id']: image['file_name']
             for image in coco_dataset['images']
-            if image['doc_category'] in filter_doc_categories}
+            if image['doc_category'] in filter_doc_categories
+            if image['precedence'] == 0
+        }
 
         # List of image IDs
         self.images: list[int] = list(self.id_to_image_filename.keys())
@@ -62,7 +64,9 @@ class COCODataset(Dataset):
 
         self.annotations: dict[int, COCOAnnotation] = dict()
         for annotation in coco_dataset['annotations']:
-            if annotation['image_id'] in images_set:
+            if annotation['image_id'] in images_set and \
+               annotation['iscrowd'] == 0 and \
+               annotation['precedence'] == 0:
                 try:
                     bbox = COCOBoundingBox(*annotation['bbox'], max_width=1025, max_height=1025)
                     self.annotations[annotation['id']] = COCOAnnotation(
