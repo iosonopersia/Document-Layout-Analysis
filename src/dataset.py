@@ -2,7 +2,6 @@ import json
 import os
 import warnings
 
-import albumentations as A
 import numpy as np
 import torch
 from PIL import Image
@@ -103,11 +102,7 @@ class COCODataset(Dataset):
         self.num_anchors_per_scale: int = len(anchors_dict[self.S[0]]) # Here we assume same num of anchors per scale
         self.ignore_iou_thresh: float = 0.5
 
-        default_transform = A.Compose(
-            [A.ToFloat(max_value=255), A.pytorch.ToTensorV2()],
-            bbox_params=A.BboxParams(format="coco", min_visibility=0.3, label_fields=['category_ids']))
-
-        self.transform = transform if transform is not None else default_transform
+        self.transform = transform
 
         self.images = list(images_with_annotations)
         self.dataset_size = len(self.images)
@@ -120,6 +115,8 @@ class COCODataset(Dataset):
 
         # Load annotations
         annotations = self.annotations_for_image[image_id]
+        bboxes: list[COCOBoundingBox] = [annotation.bbox for annotation in annotations]
+        category_ids: list[int] = [annotation.category_id for annotation in annotations]
 
         # Load image tensor
         image_filename = self.id_to_image_filename[image_id]
@@ -129,19 +126,20 @@ class COCODataset(Dataset):
         image = np.asarray(image, dtype=np.uint8)
 
         # Apply augmentations
-        bboxes = [annotation.bbox.to_list() for annotation in annotations]
-        category_ids = [annotation.category_id for annotation in annotations]
+        if self.transform is not None:
+            bboxes: list[list[float]] = [bbox.to_list() for bbox in bboxes]
 
-        augmentations = self.transform(image=image, bboxes=bboxes, category_ids=category_ids)
-        image: torch.Tensor = augmentations["image"] # Tensor of shape (C, H, W) -> (3, 1025, 1025)
-        bboxes: list[list[float]] = augmentations["bboxes"] # List of bounding boxes (x, y, w, h)
-        category_ids: list[int] = augmentations["category_ids"] # List of category IDs
+            augmentations = self.transform(image=image, bboxes=bboxes, category_ids=category_ids)
+            image: torch.Tensor = augmentations["image"] # Tensor of shape (C, H, W) -> (3, 1025, 1025)
+            bboxes: list[list[float]] = augmentations["bboxes"] # List of bounding boxes (x, y, w, h)
+            category_ids: list[int] = augmentations["category_ids"] # List of category IDs
 
-        # Convert bboxes back to COCOBoundingBox objects (sanity checks are performed on transformed bboxes)
-        bboxes: list[COCOBoundingBox] = [
-            COCOBoundingBox(*bbox, max_width=orig_width, max_height=orig_height)
-            for bbox in bboxes
-        ]
+            # Convert bboxes back to COCOBoundingBox objects
+            # (sanity checks are performed on transformed bboxes)
+            bboxes: list[COCOBoundingBox] = [
+                COCOBoundingBox(*bbox, max_width=orig_width, max_height=orig_height)
+                for bbox in bboxes
+            ]
 
         # from visualization import visualize
         # visualize(image.permute(1, 2, 0).numpy(), bboxes, category_ids, self.id_to_categories)
@@ -182,7 +180,7 @@ class COCODataset(Dataset):
                                 targets[S][anchor_idx, i, j, [0]] = -1
 
         # Extract features
-        image = self.feature_extractor(image, return_tensors='pt').pixel_values # (1, C, H, W)
+        image: torch.Tensor = self.feature_extractor(image, return_tensors='pt').pixel_values # (1, C, H, W)
         image = image.squeeze(dim=0) # (C, H, W)
 
         return {'image_id': image_id, 'image': image, 'target': targets}

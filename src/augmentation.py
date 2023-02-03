@@ -1,6 +1,5 @@
 import albumentations as A
 import cv2
-from albumentations.pytorch import ToTensorV2
 
 from utils import get_config
 
@@ -34,8 +33,6 @@ train_transforms = A.Compose(
             ],
             p=0.8),
         A.ToGray(p=0.2),
-        A.ToFloat(max_value=255),
-        ToTensorV2(),
     ],
     bbox_params=A.BboxParams(format='coco', min_visibility=0.3, label_fields=['category_ids']),
     p=0.3, # ~30% of the images will be transformed
@@ -49,8 +46,6 @@ test_transforms = A.Compose(
             min_width=IMAGE_SIZE,
             border_mode=cv2.BORDER_CONSTANT,
         ),
-        A.ToFloat(max_value=255),
-        ToTensorV2(),
     ],
     bbox_params=A.BboxParams(format='coco', min_visibility=0.3, label_fields=['category_ids']),
 )
