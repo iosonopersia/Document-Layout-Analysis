@@ -122,9 +122,6 @@ class YoloLossPerScale(nn.Module):
         # ==================== #
         #       YOLO LOSS      #
         # ==================== #
-        no_object_loss *= 0.5 # λnoobj
-        box_loss *= 5.0 # λcoord
-
         self.wandb_logger.log({
             f'size_{S}/box_loss': box_loss,
             f'size_{S}/object_loss': object_loss,
