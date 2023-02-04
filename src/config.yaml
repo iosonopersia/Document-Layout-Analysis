@@ -49,8 +49,9 @@ hyperparameters:
 
 test:
     checkpoint_path: checkpoints/model.pth
-    confidence_threshold: 0.25 # 0.05
-    nms_iou_threshold: 0.45
+    non_max_suppression:
+        min_confidence: 0.05
+        min_iou: 0.45
     # map_iou_threshold: 0.5 # At the moment I compute mAP for all the IoU thresholds between 0.5 and 0.95
 
 dataloader:
