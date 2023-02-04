@@ -7,7 +7,8 @@ from model import DocumentObjectDetector
 from tools.checkpoint_handler import CheckpointHandler
 from utils import get_anchors_dict, get_config
 
-def test_metrics():
+
+def get_bboxes_from_test_set():
     # ========== DATASET=============
     eval_loader = get_dataloader("test")
 
@@ -25,6 +26,11 @@ def test_metrics():
         anchors=SCALED_ANCHORS,
         confidence_threshold=test_cfg.non_max_suppression.min_confidence,
     )
+    return pred_boxes, true_boxes
+
+
+def test_metrics():
+    pred_boxes, true_boxes = get_bboxes_from_test_set()
     print("Computing mAP...")
     mAP_values = mean_average_precision(
         pred_boxes,
