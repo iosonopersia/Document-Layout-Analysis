@@ -11,17 +11,20 @@ if __name__ == '__main__':
     config = get_config()
     train_file = config.dataset.train_labels_file
     image_size = config.dataset.image_size
-
     filename = config.dataset.train_labels_file
+    doc_categories = config.dataset.doc_categories
+
     # Load COCO dataset
     with open(filename, "r", encoding="utf-8") as f:
         coco_dataset = json.load(f)
 
     # Filter images by doc_category
+    apply_filter: bool = (doc_categories is not None) and (len(doc_categories) > 0)
     images_set = [
         image['file_name']
         for image in coco_dataset['images']
-        if image['doc_category'] in ['scientific_articles']
+        if not apply_filter or image['doc_category'] in doc_categories
+        if image['precedence'] == 0
     ]
 
     print("Loading training images to compute mean and std across each color channel...")
@@ -64,4 +67,3 @@ if __name__ == '__main__':
             'mean': mean_per_channel.tolist(),
             'std': std_per_channel.tolist(),
         }, f)
-

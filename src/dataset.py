@@ -21,15 +21,12 @@ class COCODataset(Dataset):
         coco_file_path,
         images_dir,
         anchors_dict = {},
-        filter_doc_categories={},
+        doc_categories=None,
         transform=None,
         feature_extractor=None,
     ):
         if anchors_dict is None or len(anchors_dict) == 0:
             raise ValueError("anchors must be a non-empty dictionary.")
-
-        if filter_doc_categories is None or len(filter_doc_categories) == 0:
-            raise ValueError("filter_doc_categories must be a non-empty set.")
 
         if feature_extractor is None:
             raise ValueError("feature_extractor must be provided.")
@@ -47,10 +44,11 @@ class COCODataset(Dataset):
         self.C: int = len(self.id_to_categories)
 
         # Image ID to filename (keeps only images with doc_category in filter_doc_categories)
+        apply_filter: bool = (doc_categories is not None) and (len(doc_categories) > 0)
         self.id_to_image_filename: dict[int, str] = {
             image['id']: image['file_name']
             for image in coco_dataset['images']
-            if image['doc_category'] in filter_doc_categories
+            if not apply_filter or image['doc_category'] in doc_categories
             if image['precedence'] == 0
         }
 
@@ -224,7 +222,7 @@ def get_dataloader(split: str = "train") -> tuple[COCODataset, torch.utils.data.
         coco_file_path=dataset_cfg[split + "_labels_file"],
         images_dir=dataset_cfg.images_dir,
         anchors_dict=get_anchors_dict(dataset_cfg.anchors_file),
-        filter_doc_categories=dataset_cfg.doc_categories,
+        doc_categories=dataset_cfg.doc_categories,
         transform=train_transforms if apply_transforms else test_transforms,
         feature_extractor=feature_extractor
     )

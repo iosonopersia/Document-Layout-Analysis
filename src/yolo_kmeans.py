@@ -8,23 +8,29 @@ from utils import get_config
 
 
 class YOLO_KMeans:
-    def __init__(self, filename):
+    def __init__(self, filename, doc_categories=None):
         # Load COCO dataset
         with open(filename, "r", encoding="utf-8") as f:
             coco_dataset = json.load(f)
 
         # Filter images by doc_category
+        apply_filter: bool = (doc_categories is not None) and (len(doc_categories) > 0)
         images_set = {
             image['id']
             for image in coco_dataset['images']
-            if image['doc_category'] in ['scientific_articles']
+            if not apply_filter or image['doc_category'] in doc_categories
+            if image['precedence'] == 0
         }
 
         # Extract anchors from annotations
         boxes = [
             (annotation['bbox'][2], annotation['bbox'][3])
             for annotation in coco_dataset['annotations']
-            if annotation['image_id'] in images_set
+            if annotation['image_id'] in images_set and \
+               annotation['iscrowd'] == 0 and \
+               annotation['precedence'] == 0 and \
+               annotation['bbox'][2] > 0 and \
+               annotation['bbox'][3] > 0
         ]
 
         # Normalize each dimension by 1025 (image size 1025x1025)
@@ -72,6 +78,7 @@ class YOLO_KMeans:
         :param dist: distance function to use (default: np.median)
         :return: (k, 2) array of cluster centers
         """
+        print(f"Running k-means with k={k}...")
         # Sanity check
         assert k > 0, "k must be positive"
         k = int(k)
@@ -117,6 +124,7 @@ class YOLO_KMeans:
         :param clusters: (K, 2) array of cluster centers
         :param labels: (N,) array of cluster labels
         """
+        print(f"Saving plot to {filename}...")
         plt.figure(figsize=(6, 6))
 
         plt.scatter(self.boxes[:, 0], self.boxes[:, 1], marker=".", c=labels)
@@ -128,7 +136,7 @@ class YOLO_KMeans:
         plt.title(f"K-means clustering with k={clusters.shape[0]}")
         plt.xlabel("Width (normalized)")
         plt.ylabel("Height (normalized)")
-        plt.legend(["Boxes", "Clusters"])
+        plt.legend(["Boxes", "Clusters"], loc="upper right")
         plt.savefig(filename)
 
     def clusters_to_csv(self, clusters, filename="clusters.csv", scale=1):
@@ -138,6 +146,7 @@ class YOLO_KMeans:
         :param filename: name of the CSV file (default: clusters.csv)
         :param scale: scale factor to apply to the clusters (default: 1)
         """
+        print(f"Saving clusters to {filename}...")
         with open(filename, "wt", encoding="utf-8", newline="") as f:
             writer = csv.writer(f)
             writer.writerow(["width", "height"])
@@ -148,16 +157,19 @@ if __name__ == "__main__":
     config = get_config()
     train_file = config.dataset.train_labels_file
     image_size = config.dataset.image_size
+    anchors_file = config.dataset.anchors_file
+    doc_categories = config.dataset.doc_categories
 
-    kmeans = YOLO_KMeans(config.dataset.train_labels_file)
-    clusters = kmeans.fit(k=12) # default distance function is np.median, with np.mean AVG_IOU is 2.6% lower
+    kmeans = YOLO_KMeans(train_file, doc_categories)
+    clusters = kmeans.fit(k=12, dist=np.mean)
     labels = kmeans.transform(clusters)
 
-    print(f"K anchors:\n {clusters*image_size}")
+    print(f"Resulting anchors:\n {clusters*image_size}")
 
     avg_iou = kmeans.avg_iou(clusters)
     print(f"Avg. IoU: {round(avg_iou * 100.0, 2)}%")
 
     # Save results
-    kmeans.save_plot(clusters, labels, filename="data/anchors.png")
-    kmeans.clusters_to_csv(clusters, filename="data/anchors.csv")
+    anchors_image_file = anchors_file.replace(".csv", ".png")
+    kmeans.save_plot(clusters, labels, filename=anchors_image_file)
+    kmeans.clusters_to_csv(clusters, filename=anchors_file)
