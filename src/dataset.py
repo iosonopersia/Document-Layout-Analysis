@@ -95,9 +95,9 @@ class COCODataset(Dataset):
         self.S: list[int] = list(anchors_dict.keys()) # Grid sizes
         self.num_scales: int = len(self.S)
 
-        # Anchors
-        self.anchor_shapes: dict[int, list[float]] = anchors_dict
-        self.num_anchors_per_scale: int = len(anchors_dict[self.S[0]]) # Here we assume same num of anchors per scale
+        # Anchors (here we assume same num of anchors per scale)
+        self.anchors: torch.Tensor = torch.stack([anchors_dict[s] for s in self.S], dim=0) # (4, 3, 2)
+        self.num_anchors_per_scale: int = self.anchors.shape[1]
         self.ignore_iou_thresh: float = 0.5
 
         self.transform = transform
@@ -148,20 +148,18 @@ class COCODataset(Dataset):
             bbox = bbox.to_normalized()
             x, y, width, height = bbox.x_center, bbox.y_center, bbox.w, bbox.h # Normalized to [0, 1]
 
-            for S in self.S:
+            gt_shape: torch.Tensor = torch.tensor([width, height], dtype=torch.float32) # (2,)
+
+            jaccard_similarities = self._jaccard_similarity(gt_shape, self.anchors) # (4, 3) = (num_scales, num_anchors_per_scale)
+            sorted_anchor_indices = jaccard_similarities.argsort(dim=-1, descending=True)
+
+            for scale_idx, S in enumerate(self.S):
                 j, i = int(S * x), int(S * y) # Indices of the cell in which the center of the GT-bbox falls
                 dx, dy = (S * x) - j, (S * y) - i # Offsets of the center of the GT-bbox from the top-left corner of the cell
 
-                anchors = self.anchor_shapes[S] # Anchors for this scale
-
-                # Sort anchors by shape similarity with ground truth box (descending order)
-                anchor_similarities = {i: self._shape_similarity(bbox.w, bbox.h, *anchor) for i, anchor in enumerate(anchors)}
-                sorted_anchor_indices = sorted(anchor_similarities.keys(), key=lambda i: anchor_similarities[i], reverse=True)
-
-                is_anchor_assigned = False
-                for anchor_idx in sorted_anchor_indices:
-                    anchor_p_obj = targets[S][anchor_idx, i, j, 0].item()
-                    is_anchor_available = int(anchor_p_obj) not in (-1, 1) # -1 means ignore, 1 means object
+                is_anchor_assigned: bool = False
+                for anchor_idx in sorted_anchor_indices[scale_idx, :].tolist():
+                    is_anchor_available: bool = targets[S][anchor_idx, i, j, 0] == 0 # -1 means ignore, 1 means object
 
                     if is_anchor_available:
                         if not is_anchor_assigned:
@@ -174,7 +172,7 @@ class COCODataset(Dataset):
                             is_anchor_assigned = True
                         else:
                             # An anchor for the current scale has already been assigned to a bbox
-                            if anchor_similarities[anchor_idx] > self.ignore_iou_thresh:
+                            if jaccard_similarities[scale_idx, anchor_idx] > self.ignore_iou_thresh:
                                 targets[S][anchor_idx, i, j, [0]] = -1
 
         # Extract features
@@ -183,8 +181,12 @@ class COCODataset(Dataset):
 
         return {'image_id': image_id, 'image': image, 'target': targets}
 
-    def _shape_similarity(self, w1: float, h1: float, w2: float, h2: float) -> float:
-        intersection = min(w1, w2) * min(h1, h2)
+    def _jaccard_similarity(self, wh_1: torch.Tensor, wh_2: torch.Tensor) -> torch.Tensor:
+        w1 = wh_1[..., 0]
+        h1 = wh_1[..., 1]
+        w2 = wh_2[..., 0]
+        h2 = wh_2[..., 1]
+        intersection = torch.min(w1, w2) * torch.min(h1, h2)
         union = (w1 * h1) + (w2 * h2) - intersection
         return intersection / union
 
