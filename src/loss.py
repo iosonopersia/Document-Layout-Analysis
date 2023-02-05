@@ -39,6 +39,8 @@ class YoloLossPerScale(nn.Module):
         S = predictions.shape[2]
         C = predictions.shape[-1] - 5
 
+        TRAIN_MODE = predictions.requires_grad
+
         # Get the obj and noobj masks
         obj_mask = (target[..., OBJ] == 1).repeat(1, 1, 1, 1, 5 + C)
         noobj_mask = (target[..., OBJ] == 0).repeat(1, 1, 1, 1, 5 + C)
@@ -60,12 +62,14 @@ class YoloLossPerScale(nn.Module):
         # Check if there are any objects in the target
         NUM_OBJ = obj_mask.sum()
         if NUM_OBJ == 0:
-            self.wandb_logger.log({
-                f'size_{S}/box_loss': 0.0,
-                f'size_{S}/object_loss': 0.0,
-                f'size_{S}/no_object_loss': no_object_loss,
-                f'size_{S}/class_loss': 0.0,
-            })
+            if TRAIN_MODE:
+                # Log only during training
+                self.wandb_logger.log({
+                    f'size_{S}/box_loss': 0.0,
+                    f'size_{S}/object_loss': 0.0,
+                    f'size_{S}/no_object_loss': no_object_loss,
+                    f'size_{S}/class_loss': 0.0,
+                })
             return torch.tensor([0.0, 0.0, no_object_loss, 0.0], dtype=torch.float32)
 
         # ==================== #
@@ -85,9 +89,11 @@ class YoloLossPerScale(nn.Module):
 
         ious = intersection_over_union(predicted_boxes, target_boxes)
 
-        self.wandb_logger.log({
-            f'size_{S}/mean_iou': ious.mean(),
-        })
+        if TRAIN_MODE:
+            # Log only during training
+            self.wandb_logger.log({
+                f'size_{S}/mean_iou': ious.mean(),
+            })
 
         # ==================== #
         #      OBJECT LOSS     #
@@ -122,12 +128,14 @@ class YoloLossPerScale(nn.Module):
         # ==================== #
         #       YOLO LOSS      #
         # ==================== #
-        self.wandb_logger.log({
-            f'size_{S}/box_loss': box_loss,
-            f'size_{S}/object_loss': object_loss,
-            f'size_{S}/no_object_loss': no_object_loss,
-            f'size_{S}/class_loss': class_loss,
-        })
+        if TRAIN_MODE:
+            # Log only during training
+            self.wandb_logger.log({
+                f'size_{S}/box_loss': box_loss,
+                f'size_{S}/object_loss': object_loss,
+                f'size_{S}/no_object_loss': no_object_loss,
+                f'size_{S}/class_loss': class_loss,
+            })
 
         yolo_loss = torch.stack([box_loss, object_loss, no_object_loss, class_loss], dim=0)
         return yolo_loss
