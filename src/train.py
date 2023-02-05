@@ -142,7 +142,7 @@ def train_loop():
         log_freq=num_steps_per_epoch // 10) # log 10 times per epoch
 
     #===========CHECKPOINT===========
-    start_epoch = checkpoint_handler.restore(model, optimizer)
+    start_epoch = checkpoint_handler.restore_for_training(model, optimizer)
 
     # ===========TRAINING============
     for epoch in range(start_epoch, EPOCHS):
@@ -167,7 +167,7 @@ def train_loop():
         # ===========CHECKPOINT==========
         model_state_dict = model.state_dict()
         optimizer_state_dict = epoch_optimizer.state_dict()
-        checkpoint_handler.save(epoch, model_state_dict, optimizer_state_dict, is_frozen_epoch)
+        checkpoint_handler.save(epoch, val_loss, model_state_dict, optimizer_state_dict, is_frozen_epoch)
 
         # ========EARLY STOPPING=========
         stop: bool = early_stopping.update(epoch, val_loss, model_state_dict, optimizer_state_dict, is_frozen_epoch)

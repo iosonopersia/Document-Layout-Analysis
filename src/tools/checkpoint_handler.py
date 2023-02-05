@@ -29,17 +29,19 @@ class CheckpointHandler():
             if not os.path.isfile(self.load_path):
                 raise FileNotFoundError(f"CheckpointHandler: Checkpoint file {self.load_path} does not exist")
 
-    def save(self, epoch: int, model_state_dict: dict, optimizer_state_dict: dict, is_frozen_epoch: bool, save_path: Optional[str] = None) -> None:
+    def save(self, epoch: int, val_loss: float, model_state_dict: dict, optimizer_state_dict: dict,
+             is_frozen_epoch: bool, save_path: Optional[str] = None) -> None:
         save_path = save_path if save_path is not None else self.save_path
         if self.save_checkpoint:
             torch.save({
                 'epoch': epoch,
+                'val_loss': val_loss,
                 'model_state_dict': model_state_dict,
                 'optimizer_state_dict': optimizer_state_dict,
                 'is_frozen_epoch': is_frozen_epoch
             }, save_path)
 
-    def restore(self, model: Any, optimizer: Any) -> int:
+    def restore_for_training(self, model: Any, optimizer: Any) -> int:
         start_epoch: int = 0
         if self.load_checkpoint:
             print(f"CheckpointHandler: restoring checkpoint from {self.load_path}")
@@ -53,7 +55,7 @@ class CheckpointHandler():
 
         return start_epoch
 
-    def load(self, checkpoint_path: str, model: Any) -> int:
+    def load_for_testing(self, checkpoint_path: str, model: Any) -> int:
         checkpoint_path = os.path.abspath(checkpoint_path)
         if os.path.exists(checkpoint_path):
             print(f"CheckpointHandler: loading checkpoint from {checkpoint_path}")

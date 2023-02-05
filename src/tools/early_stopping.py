@@ -34,6 +34,12 @@ class EarlyStopping:
             self.checkpoint_handler = checkpoint_handler
             self.best_save_path = os.path.join(os.path.dirname(checkpoint_handler.save_path), f'best_weights.pth')
 
+            if os.path.exists(self.best_save_path) and os.path.isfile(self.best_save_path):
+                best_checkpoint = torch.load(self.best_save_path)
+                print(f'EarlyStopping: resuming with best_epoch={best_checkpoint["epoch"]} and best_val_loss={best_checkpoint["val_loss"]}')
+                self.best_epoch = best_checkpoint['epoch']
+                self.best_val_loss = best_checkpoint['val_loss']
+
     @only_if_enabled
     def update(self, epoch: int, val_loss: float, model_state_dict: dict, optimizer_state_dict: dict, is_frozen_epoch: bool) -> bool:
         if val_loss < self.best_val_loss:
@@ -43,6 +49,7 @@ class EarlyStopping:
             if self.restore_best:
                 self.checkpoint_handler.save(
                     epoch,
+                    val_loss,
                     model_state_dict,
                     optimizer_state_dict,
                     is_frozen_epoch,
@@ -58,6 +65,7 @@ class EarlyStopping:
                 best_model = torch.load(self.best_save_path)
                 self.checkpoint_handler.save(
                     best_model['epoch'],
+                    best_model['val_loss'],
                     best_model['model_state_dict'],
                     best_model['optimizer_state_dict'],
                     best_model['is_frozen_epoch'])

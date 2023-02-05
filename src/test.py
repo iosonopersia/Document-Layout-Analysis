@@ -1,5 +1,7 @@
 from collections import OrderedDict
+
 import torch
+
 from dataset import get_dataloader
 from metrics.bboxes_extraction import get_evaluation_bboxes
 from metrics.map import mean_average_precision
@@ -15,7 +17,7 @@ def get_bboxes_from_test_set():
     # ===========MODEL===============
     model = DocumentObjectDetector(NUM_CLASSES, model_cfg)
     model = model.to(DEVICE)
-    checkpoint_handler.load(test_cfg.checkpoint_path, model)
+    checkpoint_handler.load_for_testing(test_cfg.checkpoint_path, model)
 
     # ============TEST===============
     print("Extracting bboxes from model predictions on the test set...")
