@@ -30,10 +30,10 @@ if __name__ == '__main__':
     print("Loading training images to compute mean and std across each color channel...")
     image_folder = os.path.abspath(config.dataset.images_dir)
     image_mean = np.zeros(3, dtype=np.float32)
-    image_std = np.zeros(3, dtype=np.float32)
+    image_std = np.zeros(3, dtype=np.float32) # var[X] = E[X**2] - E[X]**2
 
     loop = tqdm(images_set, leave=True)
-    loop.set_description(f"Mean and std of training images")
+    loop.set_description(f"Processing training set images")
     loop.set_postfix(mean=0.0, std=0.0)
 
     num_processed_images = 0
@@ -45,17 +45,17 @@ if __name__ == '__main__':
         image = image / 255.0
 
         image_mean += np.mean(image, axis=(0, 1))
-        image_std += np.std(image, axis=(0, 1))
+        image_std += np.mean(np.square(image), axis=(0, 1))
 
         num_processed_images += 1
 
         # Update progress bar
-        mean_to_display = (image_mean / num_processed_images).mean()
-        std_to_display = (image_std / num_processed_images).mean()
-        loop.set_postfix(mean=mean_to_display, std=std_to_display)
+        mean_to_display = image_mean / num_processed_images
+        std_to_display = np.sqrt((image_std / num_processed_images) - np.square(mean_to_display))
+        loop.set_postfix(mean=round(mean_to_display.mean(), 3), std=round(std_to_display.mean(), 3))
 
     mean_per_channel = image_mean / len(images_set)
-    std_per_channel = image_std / len(images_set)
+    std_per_channel = np.sqrt((image_std / len(images_set)) - np.square(mean_per_channel))
 
     print(f'Mean: R={mean_per_channel[0]} G={mean_per_channel[1]} B={mean_per_channel[2]}')
     print(f'Std: R={std_per_channel[0]} G={std_per_channel[1]} B={std_per_channel[2]}')
