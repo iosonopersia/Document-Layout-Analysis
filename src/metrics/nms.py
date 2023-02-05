@@ -31,6 +31,10 @@ def nms_per_class(bboxes: torch.Tensor, iou_threshold: float, threshold: float, 
 
     bboxes = bboxes[selection_mask].reshape(-1, 7)
 
+    if bboxes.shape[0] == 0:
+        # No bounding boxes for this class
+        return bboxes
+
     # Bounding boxes are sorted by objectness score
     sorted_indices = bboxes[:, OBJ_SCORE].flatten().argsort(stable=False, dim=0, descending=True)
     bboxes = bboxes[sorted_indices, :]
