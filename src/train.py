@@ -58,7 +58,7 @@ def train_fn(train_loader, model, optimizer, epoch, loss_fn):
             loop.set_postfix(loss=epoch_loss / (i+1))
 
             wandb_logger.log({'Train/Running_loss': epoch_loss / (i+1)})
-            wandb_logger.step()
+        wandb_logger.step() # 1 step = 1 batch
 
     return epoch_loss / num_batches
 

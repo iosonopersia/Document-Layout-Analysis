@@ -76,6 +76,7 @@ dataloader:
 
 wandb:
     enabled: True
+    log_freq: 64 # number of batches between two wandb logs
     watch_model: False
     watch_model_type: 'all' # 'gradients', 'parameters', 'all', None
     project: document-layout-analysis

@@ -23,6 +23,7 @@ class WandBLogger():
 
         self.config = config
         self.enabled: bool = config.enabled if hasattr(config, 'enabled') else False
+        self.log_freq: int = config.log_freq if hasattr(config, 'log_freq') else 1
         self.entity_name: str = config.entity if hasattr(config, 'entity') else None
         self.project_name: str = config.project if hasattr(config, 'project') else None
         self.resume_run: bool = config.resume_run if hasattr(config, 'resume_run') else False
@@ -31,6 +32,8 @@ class WandBLogger():
         self.watch_model_type: str = config.watch_model_type if hasattr(config, 'watch_model_type') else None
 
         self._step: int = 0
+        if self.log_freq < 1:
+            raise ValueError("WandBLogger: log_freq must be >= 1")
 
     @only_if_enabled
     def step(self) -> None:
@@ -57,7 +60,8 @@ class WandBLogger():
 
     @only_if_enabled
     def log(self, metrics: dict) -> None:
-        wandb.log(metrics, step=self._step)
+        if self._step % self.log_freq == 0:
+            wandb.log(metrics)
 
     @only_if_enabled
     def stop_run(self) -> None:
