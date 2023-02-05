@@ -30,7 +30,7 @@ hyperparameters:
     momentum: 0.9
     gradient_accumulation_steps: 1 # 1 to disable
     frozen_backbone:
-        epochs: 1 # 0 to disable
+        epochs: 0 # 0 to disable
         learning_rate: 1.0e-3
         weight_decay: 0.01
         momentum: 0.9
