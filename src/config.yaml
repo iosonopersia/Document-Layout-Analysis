@@ -7,10 +7,10 @@ checkpoint:
     load_path: checkpoints/model.pth
 
 dataset:
-    images_dir: E:/DocLayNet_core/PNG/
-    train_labels_file: E:/DocLayNet_core/COCO/train.json
-    val_labels_file: E:/DocLayNet_core/COCO/val.json
-    test_labels_file: E:/DocLayNet_core/COCO/test.json
+    images_dir: C:/DocLayNet_core/PNG/
+    train_labels_file: C:/DocLayNet_core/COCO/train.json
+    val_labels_file: C:/DocLayNet_core/COCO/val.json
+    test_labels_file: C:/DocLayNet_core/COCO/test.json
     anchors_file: data/anchors.csv
     mean_std_file: data/mean_std.json
     num_classes: 11
