@@ -16,7 +16,7 @@ dataset:
     num_classes: 11
     image_size: 1025
     doc_categories: [] # If empty, all the categories are considered
-    apply_augmentations: False
+    apply_augmentations: True
 
 model:
     fpn_channels: 256
