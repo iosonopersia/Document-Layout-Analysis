@@ -8,7 +8,7 @@ from utils import get_config
 
 
 class YOLO_KMeans:
-    def __init__(self, filename, doc_categories=None):
+    def __init__(self, filename: str, image_size: int, doc_categories: list[str]=None):
         # Load COCO dataset
         with open(filename, "r", encoding="utf-8") as f:
             coco_dataset = json.load(f)
@@ -33,8 +33,8 @@ class YOLO_KMeans:
                annotation['bbox'][3] > 0
         ]
 
-        # Normalize each dimension by 1025 (image size 1025x1025)
-        self.boxes = np.array(boxes, dtype=np.float64) / 1025
+        # Normalize each dimension to [0, 1]
+        self.boxes = np.array(boxes, dtype=np.float64) / image_size
 
     def _iou_distance(self, clusters):
         """
@@ -159,8 +159,9 @@ if __name__ == "__main__":
     image_size = config.dataset.image_size
     anchors_file = config.dataset.anchors_file
     doc_categories = config.dataset.doc_categories
+    image_size = config.dataset.image_size
 
-    kmeans = YOLO_KMeans(train_file, doc_categories)
+    kmeans = YOLO_KMeans(train_file, image_size, doc_categories)
     clusters = kmeans.fit(k=12, dist=np.mean)
     labels = kmeans.transform(clusters)
 
