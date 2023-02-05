@@ -3,7 +3,6 @@
 .DLA_env_linux
 
 # Data folders
-data
 checkpoints
 wandb
 
