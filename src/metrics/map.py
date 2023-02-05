@@ -70,12 +70,15 @@ def average_precision_per_class(pred_boxes: torch.Tensor, true_boxes: torch.Tens
 
     TP_cumsum = torch.cumsum(is_TP, dim=0)
     precisions = TP_cumsum / torch.arange(1, num_detections + 1, dtype=torch.float32)
-    recalls = TP_cumsum / (num_ground_truths + 1e-6)
+    recalls = TP_cumsum / num_ground_truths
 
-    # Add the initial point of the ROC curve (prec=1, recall=0)
-    precisions = torch.cat((torch.tensor([1]), precisions))
-    recalls = torch.cat((torch.tensor([0]), recalls))
+    # Add first and last points to the ROC curve
+    ZERO = torch.zeros(1, dtype=torch.float32)
+    ONE = torch.ones(1, dtype=torch.float32)
+    # First point is (0, 1) and last point is (1, 0)
+    recalls = torch.cat([ZERO, recalls, ONE], dim=0)
+    precisions = torch.cat([ONE, precisions, ZERO], dim=0)
 
     # Numerical integration of the precision-recall curve
-    average_precision = torch.trapz(precisions, recalls)
+    average_precision = torch.trapezoid(y=precisions, x=recalls, dim=0)
     return average_precision
