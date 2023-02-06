@@ -65,6 +65,7 @@ class YoloLossPerScale(nn.Module):
             if TRAIN_MODE:
                 # Log only during training
                 self.wandb_logger.log({
+                    f'size_{S}/mean_iou': 1.0,
                     f'size_{S}/box_loss': 0.0,
                     f'size_{S}/object_loss': 0.0,
                     f'size_{S}/no_object_loss': no_object_loss,
@@ -88,12 +89,6 @@ class YoloLossPerScale(nn.Module):
         target_boxes = obj_target[:, BBOX]
 
         ious = intersection_over_union(predicted_boxes, target_boxes)
-
-        if TRAIN_MODE:
-            # Log only during training
-            self.wandb_logger.log({
-                f'size_{S}/mean_iou': ious.mean(),
-            })
 
         # ==================== #
         #      OBJECT LOSS     #
@@ -131,6 +126,7 @@ class YoloLossPerScale(nn.Module):
         if TRAIN_MODE:
             # Log only during training
             self.wandb_logger.log({
+                f'size_{S}/mean_iou': ious.mean(),
                 f'size_{S}/box_loss': box_loss,
                 f'size_{S}/object_loss': object_loss,
                 f'size_{S}/no_object_loss': no_object_loss,
