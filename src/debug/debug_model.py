@@ -139,14 +139,6 @@ class DocumentObjectDetector(torch.nn.Module):
 
         return yolo_output
 
-    def freeze_backbone(self):
-        pass
-        return
-
-    def unfreeze_backbone(self):
-        pass
-        return
-
 
 def test_model():
     B = 8 # batch size

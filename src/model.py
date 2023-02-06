@@ -29,7 +29,6 @@ class DocumentObjectDetector(torch.nn.Module):
             warnings.simplefilter("ignore")
             self.backbone = BeitModel.from_pretrained(self.backbone_name, add_pooling_layer=False)
         self.backbone_forward = partial(self.backbone.forward, output_hidden_states=True, return_dict=True)
-        self.is_backbone_frozen: bool = False
 
         self.num_patches_per_side: int = self.backbone.config.image_size // self.backbone.config.patch_size
         self.num_patches: int = self.num_patches_per_side ** 2
@@ -129,18 +128,6 @@ class DocumentObjectDetector(torch.nn.Module):
             yolo_output.update({feat_map_size: output})
 
         return yolo_output
-
-    def freeze_backbone(self):
-        if not self.is_backbone_frozen:
-            for param in self.backbone.parameters():
-                param.requires_grad = False
-            self.is_backbone_frozen = True
-
-    def unfreeze_backbone(self):
-        if self.is_backbone_frozen:
-            for param in self.backbone.parameters():
-                param.requires_grad = True
-            self.is_backbone_frozen = False
 
 
 def test_model():

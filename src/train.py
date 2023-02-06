@@ -101,23 +101,6 @@ def train_loop():
     loss_fn = YoloLoss(wandb_logger)
 
     # ===========OPTIMIZER===========
-    model.freeze_backbone() # marks backbone parameters as not trainable
-    if OPTIMIZER == "AdamW":
-        frozen_optimizer = optim.AdamW(
-            params=model.parameters(),
-            lr=FROZEN_LR,
-            weight_decay=FROZEN_WD)
-    elif OPTIMIZER == "SGD":
-        frozen_optimizer = optim.SGD(
-            params=model.parameters(),
-            lr=FROZEN_LR,
-            momentum=FROZEN_MOMENTUM,
-            weight_decay=FROZEN_WD,
-            nesterov=True)
-    else:
-        raise ValueError(f"Optimizer {OPTIMIZER} not supported")
-
-    model.unfreeze_backbone() # marks all parameters as trainable
     if OPTIMIZER == "AdamW":
         optimizer = optim.AdamW(
             params=model.parameters(),
@@ -146,15 +129,7 @@ def train_loop():
 
     # ===========TRAINING============
     for epoch in range(start_epoch, EPOCHS):
-        is_frozen_epoch: bool = epoch < FROZEN_EPOCHS
-        if is_frozen_epoch:
-            model.freeze_backbone()
-            epoch_optimizer = frozen_optimizer
-        else:
-            model.unfreeze_backbone()
-            epoch_optimizer = optimizer
-
-        train_loss = train_fn(train_loader, model, epoch_optimizer, epoch, loss_fn)
+        train_loss = train_fn(train_loader, model, optimizer, epoch, loss_fn)
         val_loss = eval_fn(eval_loader, model, loss_fn)
 
         # ============WANDB==============
@@ -166,11 +141,11 @@ def train_loop():
 
         # ===========CHECKPOINT==========
         model_state_dict = model.state_dict()
-        optimizer_state_dict = epoch_optimizer.state_dict()
-        checkpoint_handler.save(epoch, val_loss, model_state_dict, optimizer_state_dict, is_frozen_epoch)
+        optimizer_state_dict = optimizer.state_dict()
+        checkpoint_handler.save(epoch, val_loss, model_state_dict, optimizer_state_dict)
 
         # ========EARLY STOPPING=========
-        stop: bool = early_stopping.update(epoch, val_loss, model_state_dict, optimizer_state_dict, is_frozen_epoch)
+        stop: bool = early_stopping.update(epoch, val_loss, model_state_dict, optimizer_state_dict)
         if stop:
             break
 
@@ -187,7 +162,6 @@ if __name__ == "__main__":
     dataset_cfg = config.dataset
     model_cfg = config.model
     hyperparams_cfg = config.hyperparameters
-    frozen_backbone_cfg = hyperparams_cfg.frozen_backbone
 
     # ============TOOLS==============
     wandb_logger = WandBLogger(config.wandb)
@@ -206,12 +180,7 @@ if __name__ == "__main__":
     OPTIMIZER = hyperparams_cfg.optimizer
     ACCUMULATION_STEPS = hyperparams_cfg.gradient_accumulation_steps
 
-    FROZEN_EPOCHS = frozen_backbone_cfg.epochs
-    FROZEN_LR = frozen_backbone_cfg.learning_rate
-    FROZEN_WD = frozen_backbone_cfg.weight_decay
-    FROZEN_MOMENTUM = frozen_backbone_cfg.momentum
-
-    EPOCHS = hyperparams_cfg.epochs + FROZEN_EPOCHS
+    EPOCHS = hyperparams_cfg.epochs
     LR = hyperparams_cfg.learning_rate
     WD = hyperparams_cfg.weight_decay
     MOMENTUM = hyperparams_cfg.momentum
