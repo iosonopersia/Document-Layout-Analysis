@@ -27,7 +27,7 @@ model:
 
 hyperparameters:
     optimizer: AdamW # AdamW, SGD
-    epochs: 100
+    epochs: 60
     learning_rate: 4.0e-4
     weight_decay: 0.05
     momentum: 0.9
@@ -51,7 +51,7 @@ hyperparameters:
         restore_best: True
 
 test:
-    checkpoint_path: checkpoints/model.pth
+    checkpoint_path: checkpoints/E/model.pth
     non_max_suppression:
         min_confidence: 0.05
         min_iou: 0.45
