@@ -17,6 +17,7 @@ class DocumentObjectDetector(torch.nn.Module):
 
         self.num_classes: int = num_classes
         self.fpn_channels: int = config.fpn_channels
+        self.fpn_use_batchnorm: bool = config.fpn_use_batchnorm
         self.backbone_name: str = config.backbone
 
         if self.backbone_name is None or self.backbone_name == "":
@@ -94,7 +95,8 @@ class DocumentObjectDetector(torch.nn.Module):
         self.fpn = torchvision.ops.FeaturePyramidNetwork(
             in_channels_list=[self.hidden_size]*len(self.fpn_layers),
             out_channels=self.fpn_channels,
-            norm_layer=torch.nn.BatchNorm2d)
+            norm_layer=torch.nn.BatchNorm2d if self.fpn_use_batchnorm else None,
+        )
 
         # YOLOv3 head (1x1 convolutions)
         self.yolo_head = torch.nn.Conv2d(in_channels=self.fpn_channels, out_channels=3 * (5 + self.num_classes), kernel_size=1)

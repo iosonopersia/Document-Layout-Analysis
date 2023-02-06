@@ -19,7 +19,10 @@ dataset:
     apply_augmentations: True
 
 model:
+    # DiT implementation uses default Detectron2 config values for the following parameters
+    # See https://github.com/facebookresearch/detectron2/blob/dc9ad7055b48f25ab0a13e817c1a427b1385f98a/detectron2/config/defaults.py#L140-L154
     fpn_channels: 256
+    fpn_use_batchnorm: False
     backbone: microsoft/dit-base
 
 hyperparameters:
