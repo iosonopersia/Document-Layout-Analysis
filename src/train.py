@@ -3,6 +3,7 @@ from collections import OrderedDict
 import torch
 import torch.optim as optim
 from tqdm import tqdm
+from transformers import get_cosine_schedule_with_warmup
 
 from dataset import get_dataloader
 from loss import YoloLoss
@@ -15,7 +16,7 @@ from utils import get_anchors_dict, get_config
 torch.backends.cudnn.benchmark = True # improves training speed if input size doesn't change
 
 
-def train_fn(train_loader, model, optimizer, epoch, loss_fn):
+def train_fn(train_loader, model, optimizer, scheduler, epoch, loss_fn):
     loop = tqdm(train_loader, leave=True)
     loop.set_description(f"Epoch [{epoch + 1}/{EPOCHS}]")
     loop.set_postfix(loss=0.0)
@@ -51,13 +52,19 @@ def train_fn(train_loader, model, optimizer, epoch, loss_fn):
                     norm_type=gradient_clip_cfg.grad_norm_type)
             # Update parameters
             optimizer.step()
+            # Update learning rate
+            if scheduler_cfg.enabled:
+                scheduler.step()
             # Reset gradients
             model.zero_grad()
 
             # Update progress bar
             loop.set_postfix(loss=epoch_loss / (i+1))
 
-            wandb_logger.log({'Train/Running_loss': epoch_loss / (i+1)})
+            wandb_logger.log({
+                'Train/Running_loss': epoch_loss / (i+1),
+                'Train/Learning_rate': optimizer.param_groups[0]['lr']
+            })
         wandb_logger.step() # 1 step = 1 batch
 
     return epoch_loss / num_batches
@@ -127,9 +134,17 @@ def train_loop():
     #===========CHECKPOINT===========
     start_epoch = checkpoint_handler.restore_for_training(model, optimizer)
 
+    # ===========SCHEDULER===========
+    scheduler = get_cosine_schedule_with_warmup(
+        optimizer,
+        WARMUP_EPOCHS*len(train_loader),
+        EPOCHS*len(train_loader),
+        num_cycles=0.5, # 0.5 means half cosine cycle
+        last_epoch=start_epoch-1)
+
     # ===========TRAINING============
     for epoch in range(start_epoch, EPOCHS):
-        train_loss = train_fn(train_loader, model, optimizer, epoch, loss_fn)
+        train_loss = train_fn(train_loader, model, optimizer, scheduler, epoch, loss_fn)
         val_loss = eval_fn(eval_loader, model, loss_fn)
 
         # ============WANDB==============
@@ -162,6 +177,7 @@ if __name__ == "__main__":
     dataset_cfg = config.dataset
     model_cfg = config.model
     hyperparams_cfg = config.hyperparameters
+    scheduler_cfg = hyperparams_cfg.scheduler
 
     # ============TOOLS==============
     wandb_logger = WandBLogger(config.wandb)
@@ -184,5 +200,7 @@ if __name__ == "__main__":
     LR = hyperparams_cfg.learning_rate
     WD = hyperparams_cfg.weight_decay
     MOMENTUM = hyperparams_cfg.momentum
+
+    WARMUP_EPOCHS = scheduler_cfg.warmup_epochs
 
     train_loop()

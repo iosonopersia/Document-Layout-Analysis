@@ -37,9 +37,8 @@ hyperparameters:
         max_grad_norm: 1.0
         grad_norm_type: 2 # Euclidean norm
     scheduler:
-        enabled: False
-        scheduler_fn: ExponentialLR
-        gamma: 0.99
+        enabled: True
+        warmup_epochs: 1 # 0 to disable
     early_stopping:
         enabled: True
         patience: 3
