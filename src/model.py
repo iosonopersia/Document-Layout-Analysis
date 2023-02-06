@@ -4,7 +4,7 @@ from functools import partial
 from munch import Munch
 
 import torch
-import torchvision
+from torchvision.ops.feature_pyramid_network import FeaturePyramidNetwork
 from torch import Tensor
 from transformers import BeitModel, logging
 
@@ -35,7 +35,6 @@ class DocumentObjectDetector(torch.nn.Module):
         self.num_patches: int = self.num_patches_per_side ** 2
         self.num_hidden_layers: int = self.backbone.config.num_hidden_layers
         self.hidden_size: int = self.backbone.config.hidden_size
-        self.feature_maps_activation = torch.nn.GELU()
 
         # Feature map rescalers (as implemented by the authors of the DiT paper)
         # See https://github.com/microsoft/unilm/blob/4dfdda9fbe950c73616c65efc5b7f6b1a3d2a60a/dit/object_detection/ditod/deit.py#L262-L275
@@ -54,8 +53,6 @@ class DocumentObjectDetector(torch.nn.Module):
                     out_channels=self.hidden_size,
                     kernel_size=2,
                     stride=2),
-                torch.nn.BatchNorm2d(num_features=self.hidden_size),
-                torch.nn.GELU(),
             ),
             # 2x upscaling
             torch.nn.Sequential(
@@ -64,16 +61,12 @@ class DocumentObjectDetector(torch.nn.Module):
                     out_channels=self.hidden_size,
                     kernel_size=2,
                     stride=2),
-                torch.nn.BatchNorm2d(num_features=self.hidden_size),
-                torch.nn.GELU(),
             ),
             # identity
             torch.nn.Identity(),
             # 2x downscaling
             torch.nn.Sequential(
                 torch.nn.MaxPool2d(kernel_size=2, stride=2),
-                torch.nn.BatchNorm2d(num_features=self.hidden_size),
-                torch.nn.GELU(),
             ),
         ])
 
@@ -92,7 +85,7 @@ class DocumentObjectDetector(torch.nn.Module):
             self.num_patches_per_side, # number of patches along the vertical axis
             self.num_patches_per_side # number of patches along the horizontal axis
         )
-        self.fpn = torchvision.ops.FeaturePyramidNetwork(
+        self.fpn = FeaturePyramidNetwork(
             in_channels_list=[self.hidden_size]*len(self.fpn_layers),
             out_channels=self.fpn_channels,
             norm_layer=torch.nn.BatchNorm2d if self.fpn_use_batchnorm else None,
@@ -113,8 +106,6 @@ class DocumentObjectDetector(torch.nn.Module):
         feature_maps = feature_maps.transpose(2, 3) # (B, 4, 768, 196)
         feature_maps = feature_maps.reshape(self.FEAT_MAPS_SHAPE) # (B, 4, 768, 14, 14)
 
-        # Apply non-linear activation
-        feature_maps = self.feature_maps_activation(feature_maps)
 
         fpn_input: dict[str, Tensor] = OrderedDict()
         for i in range(len(self.fpn_layers)):
@@ -132,7 +123,7 @@ class DocumentObjectDetector(torch.nn.Module):
         for feat_map in fpn_output.values():
             feat_map_size: int = feat_map.shape[-1]
 
-            output = self.yolo_head(feat_map) # (B, 3 * (5 + C), feat_map_size, feat_map_size)
+            output: Tensor = self.yolo_head(feat_map) # (B, 3 * (5 + C), feat_map_size, feat_map_size)
             output = output.reshape(-1, 3, 5 + self.num_classes, feat_map_size, feat_map_size) # (B, 3, 5 + C, feat_map_size, feat_map_size)
             output = output.transpose(2, 4) # (B, 3, feat_map_size, feat_map_size, 5 + C)
             yolo_output.update({feat_map_size: output})
