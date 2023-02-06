@@ -43,7 +43,8 @@ class EarlyStopping:
                 self.best_val_loss = best_checkpoint['val_loss']
 
     @only_if_enabled
-    def update(self, epoch: int, val_loss: float, model_state_dict: dict, optimizer_state_dict: dict) -> bool:
+    def update(self, epoch: int, val_loss: float, model_state_dict: dict, optimizer_state_dict: dict,
+               scheduler_last_epoch: int) -> bool:
         if val_loss < self.best_val_loss:
             self.best_epoch = epoch
             self.best_val_loss = val_loss
@@ -54,6 +55,7 @@ class EarlyStopping:
                     val_loss,
                     model_state_dict,
                     optimizer_state_dict,
+                    scheduler_last_epoch,
                     save_path=self.best_save_path)
 
         delta = epoch - self.best_epoch # epochs without improvement
@@ -68,7 +70,8 @@ class EarlyStopping:
                     best_model['epoch'],
                     best_model['val_loss'],
                     best_model['model_state_dict'],
-                    best_model['optimizer_state_dict'])
+                    best_model['optimizer_state_dict'],
+                    best_model['scheduler_last_epoch'])
                 os.remove(self.best_save_path)
 
         return stop

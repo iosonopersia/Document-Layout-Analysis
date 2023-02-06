@@ -132,15 +132,16 @@ def train_loop():
         log_freq=num_steps_per_epoch // 10) # log 10 times per epoch
 
     #===========CHECKPOINT===========
-    start_epoch = checkpoint_handler.restore_for_training(model, optimizer)
+    start_epoch, scheduler_last_epoch = checkpoint_handler.restore_for_training(model, optimizer)
 
     # ===========SCHEDULER===========
+    num_steps_per_epoch = len(train_loader) // ACCUMULATION_STEPS
     scheduler = get_cosine_schedule_with_warmup(
         optimizer,
-        WARMUP_EPOCHS*len(train_loader),
-        EPOCHS*len(train_loader),
+        WARMUP_EPOCHS*num_steps_per_epoch,
+        EPOCHS*num_steps_per_epoch,
         num_cycles=0.5, # 0.5 means half cosine cycle
-        last_epoch=start_epoch-1)
+        last_epoch=scheduler_last_epoch)
 
     # ===========TRAINING============
     for epoch in range(start_epoch, EPOCHS):
@@ -157,10 +158,11 @@ def train_loop():
         # ===========CHECKPOINT==========
         model_state_dict = model.state_dict()
         optimizer_state_dict = optimizer.state_dict()
-        checkpoint_handler.save(epoch, val_loss, model_state_dict, optimizer_state_dict)
+        scheduler_last_epoch = scheduler.last_epoch
+        checkpoint_handler.save(epoch, val_loss, model_state_dict, optimizer_state_dict, scheduler_last_epoch)
 
         # ========EARLY STOPPING=========
-        stop: bool = early_stopping.update(epoch, val_loss, model_state_dict, optimizer_state_dict)
+        stop: bool = early_stopping.update(epoch, val_loss, model_state_dict, optimizer_state_dict, scheduler_last_epoch)
         if stop:
             break
 

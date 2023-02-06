@@ -30,7 +30,7 @@ class CheckpointHandler():
                 raise FileNotFoundError(f"CheckpointHandler: Checkpoint file {self.load_path} does not exist")
 
     def save(self, epoch: int, val_loss: float, model_state_dict: dict, optimizer_state_dict: dict,
-             save_path: Optional[str] = None) -> None:
+             scheduler_last_epoch: int, save_path: Optional[str] = None) -> None:
         save_path = save_path if save_path is not None else self.save_path
         if self.save_checkpoint:
             torch.save({
@@ -38,18 +38,21 @@ class CheckpointHandler():
                 'val_loss': val_loss,
                 'model_state_dict': model_state_dict,
                 'optimizer_state_dict': optimizer_state_dict,
+                'scheduler_last_epoch': scheduler_last_epoch,
             }, save_path)
 
     def restore_for_training(self, model: Any, optimizer: Any) -> int:
         start_epoch: int = 0
+        scheduler_last_epoch: int = -1
         if self.load_checkpoint:
             print(f"CheckpointHandler: restoring checkpoint from {self.load_path}")
             checkpoint = torch.load(self.load_path)
             start_epoch = checkpoint['epoch'] + 1 # start from the next epoch
             model.load_state_dict(checkpoint['model_state_dict'])
             optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+            scheduler_last_epoch = checkpoint['scheduler_last_epoch']
 
-        return start_epoch
+        return start_epoch, scheduler_last_epoch
 
     def load_for_testing(self, checkpoint_path: str, model: Any) -> int:
         checkpoint_path = os.path.abspath(checkpoint_path)

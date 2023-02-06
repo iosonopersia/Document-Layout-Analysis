@@ -105,7 +105,6 @@ class DocumentObjectDetector(torch.nn.Module):
         feature_maps = feature_maps.transpose(2, 3) # (B, 4, 768, 196)
         feature_maps = feature_maps.reshape(self.FEAT_MAPS_SHAPE) # (B, 4, 768, 14, 14)
 
-
         fpn_input: dict[str, Tensor] = OrderedDict()
         for i in range(len(self.fpn_layers)):
             feat_map = feature_maps[:, i, ...] # (B, 768, 14, 14)
