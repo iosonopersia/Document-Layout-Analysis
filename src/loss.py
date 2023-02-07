@@ -68,7 +68,7 @@ class YoloLossPerScale(nn.Module):
                     f'size_{S}/mean_iou': 1.0,
                     f'size_{S}/box_loss': 0.0,
                     f'size_{S}/object_loss': 0.0,
-                    f'size_{S}/no_object_loss': no_object_loss,
+                    f'size_{S}/no_object_loss': no_object_loss.item(),
                     f'size_{S}/class_loss': 0.0,
                 })
             return torch.tensor([0.0, 0.0, no_object_loss, 0.0], dtype=torch.float32)
@@ -126,11 +126,11 @@ class YoloLossPerScale(nn.Module):
         if TRAIN_MODE:
             # Log only during training
             self.wandb_logger.log({
-                f'size_{S}/mean_iou': ious.mean(),
-                f'size_{S}/box_loss': box_loss,
-                f'size_{S}/object_loss': object_loss,
-                f'size_{S}/no_object_loss': no_object_loss,
-                f'size_{S}/class_loss': class_loss,
+                f'size_{S}/mean_iou': ious.mean().item(),
+                f'size_{S}/box_loss': box_loss.item(),
+                f'size_{S}/object_loss': object_loss.item(),
+                f'size_{S}/no_object_loss': no_object_loss.item(),
+                f'size_{S}/class_loss': class_loss.item(),
             })
 
         yolo_loss = torch.stack([box_loss, object_loss, no_object_loss, class_loss], dim=0)
