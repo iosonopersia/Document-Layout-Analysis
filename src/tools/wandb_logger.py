@@ -32,20 +32,27 @@ class WandBLogger():
         self.watch_model_type: str = config.watch_model_type if hasattr(config, 'watch_model_type') else None
 
         self._step: int = 0
+        self._metrics: dict = {}
         if self.log_freq < 1:
             raise ValueError("WandBLogger: log_freq must be >= 1")
 
     @only_if_enabled
     def step(self) -> None:
+        # Increment step counter
         self._step += 1
+        # Log metrics every log_freq steps if there are any
+        if (self._step + 1) % self.log_freq == 0 and self._metrics:
+            wandb.log(self._metrics)
+            self._metrics = {}
 
     @only_if_enabled
-    def reset_step(self) -> None:
+    def _reset_run(self) -> None:
         self._step = 0
+        self._metrics = {}
 
     @only_if_enabled
     def start_new_run(self, run_config: Munch = None) -> None:
-        self.reset_step()
+        self._reset_run()
 
         os_start_method = 'spawn' if os.name == 'nt' else 'fork'
         run_datetime = datetime.now().isoformat().split('.')[0]
@@ -60,13 +67,18 @@ class WandBLogger():
 
     @only_if_enabled
     def log(self, metrics: dict) -> None:
-        if self._step % self.log_freq == 0:
-            wandb.log(metrics)
+        # Fill the metrics buffer (new metrics will overwrite old ones)
+        self._metrics.update(metrics)
 
     @only_if_enabled
     def stop_run(self) -> None:
+        # Log any remaining metrics
+        if self._metrics:
+            wandb.log(self._metrics)
+            self._metrics = {}
+
         wandb.finish()
-        self.reset_step()
+        self._reset_run()
 
     @only_if_enabled
     def start_watcher(self, model: Any, criterion: Any, log_freq: int = 1) -> None:
