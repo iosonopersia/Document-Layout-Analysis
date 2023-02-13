@@ -66,8 +66,6 @@ def test_metrics():
     for i, iou in enumerate(iou_thresholds):
         mAP_per_iou = mAP_values[:, i].mean().item() * 100.0
         print(f"\tmAP@{iou:.2f}\t{round(mAP_per_iou, 3)} %")
-            mAP_per_class_per_iou = mAP_values[i, c].item() * 100.0
-            print(f"\tmAP@{iou}\t{round(mAP_per_class_per_iou, 3)} %")
 
 
 if __name__ == "__main__":
