@@ -45,9 +45,9 @@ hyperparameters:
         restore_best: True
 
 test:
-    checkpoint_path: checkpoints/E/model.pth
+    checkpoint_path: checkpoints/model.pth
     non_max_suppression:
-        min_confidence: 0.05
+        min_confidence: 0.1
         min_iou: 0.45
     # map_iou_threshold: 0.5 # At the moment I compute mAP for all the IoU thresholds between 0.5 and 0.95
 
