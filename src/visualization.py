@@ -89,3 +89,4 @@ def visualize(image: ndarray, bboxes: list[COCOBoundingBox], category_ids: list[
     plt.figure(figsize=(12, 12))
     plt.axis('off')
     plt.imshow(img)
+    plt.savefig('output.png')
